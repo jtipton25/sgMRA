@@ -1,0 +1,23 @@
+Package: sgMRA
+Title: Multi-Resolution Gaussian Process Approximations with Stochastic Gradient Descent
+Version: 0.0.0.9000
+Authors@R: person("John", "Tipton", email = "jrtipton@uark.edu", 
+    role = c("aut", "cre"))
+Description: Software for fitting sparse multi-resolution spatial models using stochastic gradient descent.
+License: GPL (>= 3)
+Depends: R (>= 3.5.0)
+Imports: 
+    BayesMRA,
+    splines
+Roxygen: list(markdown = TRUE)    
+RoxygenNote: 7.1.2
+Suggests: 
+    knitr,
+    pkgdown,
+    rmarkdown,
+    testthat (>= 2.1.0),
+    covr
+URL: https://github.com/jtipton25/sgMRA
+BugReports: https://github.com/jtipton25/sgMRA/issues    
+VignetteBuilder: knitr
+Encoding: UTF-8
