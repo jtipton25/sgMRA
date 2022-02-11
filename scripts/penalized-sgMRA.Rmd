@@ -1,0 +1,33 @@
+---
+title: "penalized sgMRA"
+author: "John Tipton"
+date: "2/7/2022"
+output: html_document
+---
+<!-- Define argmin and argmax -->
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Unconstrained optimization
+
+Goal: to optimize the least squares problem 
+\begin{align*}
+\underset{\boldsymbol{\beta}}{\argmin} \| \left( \mathbf{y} - \mathbf{X} \boldsymbol{\beta} \right)'\left( \mathbf{y} - \mathbf{X} \boldsymbol{\beta} \right) \| + \lambda \boldsymbol{\beta}'\mathbf{Q}\boldsymbol{\beta}
+\end{align*}
+for some penalty matrix $\mathbf{Q}$. Thus, the gradient of the penalized optimization is
+
+\begin{align*}
+\frac{2}{N} \left( \mathbf{X}'\mathbf{X}\boldsymbol{\beta} - \mathbf{X}'\mathbf{y} + \mathbf{Q} \boldsymbol{\beta} \right)
+\end{align*}
+
+* Question: Can you also tune the penalty parameter with gradient descent?
+
+# Constrained optimization
+
+Perform gradient descent with the constraint $\sum_{i=1}^N \mathbf{x}_i \boldsymbol{\beta} = 0$ where $\mathbf{x}_i'$ is the $i$th row of $\mathbf{X}$.

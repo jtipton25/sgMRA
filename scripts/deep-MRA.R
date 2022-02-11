@@ -11,7 +11,7 @@ library(BayesMRA)
 library(patchwork)
 
 
-# set.seed(44)
+set.seed(44)
 N <- 100^2
 locs <- expand_grid(x=seq(0, 1, length.out=sqrt(N)),
                     y=seq(0, 1, length.out=sqrt(N)))
@@ -60,6 +60,16 @@ p2 <- ggplot(dat, aes(x = x, y = y, fill = y_obs)) +
 p1 + p2
 
 
+dat <- data.frame(x = locs$x, y = locs$y, layer = rep(c(1, 1, 2, 2, 3), each=N),
+                  group = rep(c("x", "y", "x", "y", "z"), each = N),
+                  z = c(W1 %*% alpha_x1, W1 %*% alpha_y1,
+                        W2 %*% alpha_x2, W2 %*% alpha_y2,
+                        W %*% alpha))
+ggplot(dat, aes(x, y, fill=z)) +
+    geom_raster() +
+    scale_fill_viridis_c() +
+    facet_grid(layer~ group)
+
 
 # Fit the MCMC using ESS ----
 # source("~/sgMRA/scripts/deep_mra_ess.R")
@@ -69,7 +79,7 @@ p1 + p2
 source("~/sgMRA/scripts/deep_mra_mh.R")
 source("~/sgMRA/R/update-tuning.R")
 # Fit the MCMC using MH
-out <- deep_mra_mh(y_obs, locs, n_message = 10, n_mcmc = 500)
+out <- deep_mra_mh(y_obs, locs, n_message = 10, n_mcmc = 5000)
 plot(out$sigma, type = 'l')
 abline(h = sigma)
 
@@ -100,3 +110,9 @@ p5 <- ggplot(dat, aes(x = z, y = z_last)) +
     geom_point() +
     stat_smooth(method = 'lm')
 p4 + p5
+
+
+cor(dat$z, dat$z_mean)
+cor(dat$z, dat$z_last)
+
+lapply(out,  function(x) {format(object.size(x), units="MB")})

@@ -24,7 +24,7 @@
 #' @export
 #'
 
-ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun, max_iter = 500) {
+ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun, max_iter = 50) {
 
     pars$num_calls_ess <- pars$num_calls_ess + 1
 
@@ -41,7 +41,7 @@ ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun,
     phi_angle_max <- phi_angle
 
     updated_pars <- pars
-    updated_pars$parameter <- current
+    # updated_pars$parameter <- current
 
     test <- TRUE
     count <- 0
@@ -56,7 +56,7 @@ ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun,
             if (pars$verbose)
                 message("maximum number of contractions in ess reached, if this happens often, try increasing max_iter")
             pars$num_max_contract <- pars$num_max_contract + 1
-            pars$parameter        <- current
+            # pars$parameter        <- current
             return(pars)
         }
 
@@ -75,7 +75,8 @@ ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun,
             ## this happens sometimes when the proposal is far from the posterior
             ## and if it happens occasionally it isn't a problem
             if (pars$verbose)
-                message("An unusual log-likelihood was evaluated for ", pars$par_name, " using the elliptical slice sampler. If this warning is rare, it should be safe to ignore")
+                message("An unusual log-likelihood was evaluated for the elliptical slice sampler. If this warning is rare, it should be safe to ignore")
+            # message("An unusual log-likelihood was evaluated for ", pars$par_name, " using the elliptical slice sampler. If this warning is rare, it should be safe to ignore")
             pars$num_unusual_ll         <- pars$num_unusual_ll + 1
             updated_pars$num_unusual_ll <- updated_pars$num_unusual_ll + 1
             ## Skip this iteration and propose new angle difference
@@ -83,7 +84,7 @@ ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun,
             count     <- count + 1
         } else if (proposal_log_like > hh) {
             ## proposal is on the slice
-            updated_pars$parameter <- proposal
+            # updated_pars$parameter <- proposal
             test <- FALSE
         } else if (phi_angle > 0.0) {
             ## proposal is not on the slice and adjust the proposal window
@@ -92,7 +93,7 @@ ess <- function(current, prior, prior_mean, pars, log_like_fun, update_pars_fun,
             ## proposal is not on the slice and adjust the proposal window
             phi_angle_min <- phi_angle
         } else {
-            warning("Bug - ESS for eta_star shrunk to current position \n")
+            warning("Bug - ESS shrunk to current position \n")
             test <- FALSE
         }
         ## Propose new angle difference
