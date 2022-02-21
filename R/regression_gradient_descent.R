@@ -27,8 +27,12 @@ regression_gradient_descent <- function(y, X, W,
     message("Initializing parameters")
     U <- cbind(X, W)
     tU <- t(U)
-    tUU <- tU %*% U
-    tUy <- tU %*% y
+    tUU <- NULL
+    tUy <- NULL
+    if (is.null(minibatch_size)) {
+        tUU <- tU %*% U
+        tUy <- tU %*% y
+    }
 
     # initialize algorithm
     loss <- rep(0, num_iters)
@@ -49,8 +53,11 @@ regression_gradient_descent <- function(y, X, W,
     } else {
         idx <- sample(1:length(y), minibatch_size)
         y_idx <- y[idx]
-        tUy_idx <- tU[, idx] %*% y_idx
-        beta_new <- beta_old - alpha * gradient_fun(y_idx, tUy_idx, tUU, beta_old)
+        tU_idx <- tU[, idx]
+        tUy_idx <- tU_idx %*% y_idx
+        # tUU_idx <- tU_idx %*% t(tU_idx)
+        # faster to subset tU to get tU_idx then transpose to U_idx than to subset U directly
+        beta_new <- beta_old - alpha * gradient_fun_mini(y_idx, tUy_idx, t(tU_idx), tU_idx, beta_old)
     }
 
     i <- 2
@@ -65,8 +72,11 @@ regression_gradient_descent <- function(y, X, W,
         } else {
             idx <- sample(1:length(y), minibatch_size)
             y_idx <- y[idx]
-            tUy_idx <- tU[, idx] %*% y_idx
-            beta_new <- beta_new - alpha * gradient_fun(y_idx, tUy_idx, tUU, beta_new)
+            tU_idx <- tU[, idx]
+            tUy_idx <- tU_idx %*% y_idx
+            # tUU_idx <- tU_idx %*% t(tU_idx)
+            # faster to subset tU to get tU_idx then transpose to U_idx than to subset U directly
+            beta_new <- beta_old - alpha * gradient_fun_mini(y_idx, tUy_idx, t(tU_idx), tU_idx, beta_old)
         }
         loss[i] <- target_fun(y, U, beta_new)
         # save the estimates on the original data scale (not normalized scale)

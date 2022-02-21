@@ -11,6 +11,7 @@ library(sgMRA)
 library(BayesMRA)
 library(spam)
 library(Matrix)
+library(patchwork)
 set.seed(11)
 
 N <- 400^2
@@ -32,7 +33,7 @@ p <- ncol(X)
 beta <- rnorm(ncol(X))
 
 ## MRA spatio-temporal random effect
-M <- 4
+M <- 3
 n_coarse <- 30
 
 MRA    <- mra_wendland_2d(locs, M = M, n_coarse = n_coarse, use_spam = TRUE)
@@ -63,29 +64,74 @@ sigma2 <- runif(1, 0.25, 0.5)
 
 y <- as.numeric(X %*% beta + W %*% alpha + rnorm(N, 0, sqrt(sigma2)))
 
+dat <- data.frame(x=locs[, 1], y = locs[, 2], z = y)
+
+p_sim <- ggplot(dat, aes(x, y, fill = z)) +
+    geom_raster() +
+    scale_fill_viridis_c() +
+    ggtitle("Simulated")
+p_sim
 
 # gradient descent function for MRA using minibatch ----
 
 U <- cbind(X, W)
 
-# profvis::profvis(
-system.time(
-    dat <- regression_gradient_descent(c(y),
+
+profvis::profvis(
+# system.time(
+    dat_mini <- regression_gradient_descent(c(y),
                                        X, W, inits = rnorm(ncol(U)),
                                        threshold = 0.000001,
-                                       alpha = 0.0001, num_iters = 500, print_every = 10,
+                                       alpha = 0.5, num_iters = 500,
+                                       print_every = 10,
                                        minibatch_size = 2^6)
 )
 
 # Using full gradient
 # profvis::profvis(
 system.time(
-    dat <- regression_gradient_descent(c(y),
+    dat_full <- regression_gradient_descent(c(y),
                                        X, W, inits = rnorm(ncol(U)),
                                        threshold = 0.000001,
-                                       alpha = 0.1, num_iters = 500, print_every = 10,
+                                       alpha = 0.5, num_iters = 500,
+                                       print_every = 10,
                                        minibatch_size = NULL)
 )
+
+
+# predictions from the minibatch model
+beta_idx <- grepl("beta", names(dat_mini))
+beta_fit_mini <- dat_mini[nrow(dat_mini), beta_idx]
+y_pred_mini <- U %*% as.numeric(beta_fit_mini)
+# predictions from the full model
+beta_idx <- grepl("beta", names(dat_full))
+beta_fit_full <- dat_full[nrow(dat_full), beta_idx]
+y_pred_full <- U %*% as.numeric(beta_fit_full)
+
+
+dat <- data.frame(x = locs[, 1], y = locs[, 2], z = drop(W %*% alpha), y_sim = y,
+                  y_pred_mini = drop(y_pred_mini), y_pred_full = drop(y_pred_full))
+
+p_mini <- ggplot(dat, aes(x, y, fill = y_pred_mini)) +
+    geom_raster() +
+    scale_fill_viridis_c() +
+    ggtitle("Minibatch fit")
+p_full <- ggplot(dat, aes(x, y, fill = y_pred_full)) +
+    geom_raster() +
+    scale_fill_viridis_c() +
+    ggtitle("Full fit")
+
+p_sim + p_mini + p_full
+
+sd(y - y_pred_mini)
+sd(y - y_pred_full)
+
+
+dat %>%
+    pivot_longer(cols= y_pred_mini:y_pred_full) %>%
+    ggplot(aes(x = y_sim, y=value)) +
+    geom_point() +
+    facet_wrap(~ name)
 
 tU <- t(U)
 tUU <- t(U) %*% U

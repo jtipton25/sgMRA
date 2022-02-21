@@ -77,6 +77,10 @@ ggplot(data.frame(y = dat_sim$y, y_pred = preds)) +
     geom_point(aes(y_pred, y)) +
     geom_abline(color = 'red')
 
+# check the prediction error
+sd(dat_sim$epsilon)
+sd(preds - dat_sim$y)
+
 # p <- ggplot(data = NULL, aes(x = X[, 2], y = y - Z %*% alpha)) +
 #     geom_point() +
 #     geom_abline(data = dat, aes(intercept = `beta[0]`, slope = `beta[1]`, color = iteration), alpha = 0.25) +

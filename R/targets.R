@@ -27,6 +27,22 @@ gradient_fun <- function(y, tXy, tXX, beta) {
 }
 
 
+#' Calculate the Gradient for Regression using minibatch
+#'
+#' @inheritParams gradient_fun_penalty
+#' @inheritParams target_fun
+#'
+#' @return The gradient vector
+#' @export
+#'
+
+gradient_fun_mini <- function(y, tXy, X, tX, beta) {
+    return((tX %*% (X %*% beta) - tXy) / length(y))
+}
+
+
+
+
 #' Calculate the Gradient for Penalized Regression
 #'
 #' @inheritParams target_fun

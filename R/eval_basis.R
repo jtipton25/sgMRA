@@ -1,4 +1,4 @@
-make_grid <- function(
+make_grid <- function(locs,
     min_x = -6, min_y = -6, max_x = 6, max_y = 6,
     M             = 4,
     n_coarse_grid = 10,
@@ -83,15 +83,14 @@ make_grid <- function(
 eval_basis <- function(
     locs,
     grid,
-    M             = 4,
-    n_coarse_grid = 10,
     n_padding     = 5L,
     n_neighbors   = 68,
     max_points    = NULL,
     # n_max_fine_grid = 2^12,
     # radius      = 25,
     basis_type    = "wendland",
-    use_spam      = TRUE
+    use_spam      = TRUE,
+    calc_derivative = TRUE
 ) {
     ##
     ## check inputs
@@ -143,7 +142,12 @@ eval_basis <- function(
     ## or the largest power of 2 larger than N
     # n_grid <- ceiling(min(n_max_fine_grid, 2^ceiling(log(N, base = 2)))^(0.5) / 2^(M:1 - 1))
 
+    M <- length(grid$locs_grid)
     W            <- vector(mode = "list", length = M)
+    dW           <- vector(mode = "list", length = M)
+    ddistx       <- vector(mode = "list", length = M)
+    ddisty       <- vector(mode = "list", length = M)
+    diffs        <- vector(mode = "list", length = M)
 
     # guess the max_points variable
 
@@ -151,18 +155,43 @@ eval_basis <- function(
 
 
         # D <- rdist(locs, locs_grid[[m]])
-        D <- fields::fields.rdist.near(locs, grid$locs_grid[[m]], delta = grid$radius[m],
-                               max.points = max_points)
+        # rewrite this to include dW and ddist functions for more efficiency
+        D <- fields::fields.rdist.near(locs,
+                                       grid$locs_grid[[m]],
+                                       delta = grid$radius[m],
+                                       max.points = max_points)
 
-        D$ra <- make_basis(D$ra, grid$radius[m], basis_type = "wendland")
+        D$basis <- make_basis(D$ra, grid$radius[m], basis_type = "wendland")
+
+        if (calc_derivative) {
+            D$dbasis <- dwendland_basis(D$ra, grid$radius[m])
+            # Note: this will likely fail for multiple resolutions
+            diffs <- 2*(locs[D$ind[, 1], ] - grid$locs_grid[[m]][D$ind[, 2], ])
+            D$diffsx <- diffs[[1]]
+            D$diffsy <- -diffs[[2]]
+        }
+
         if (use_spam) {
             ## use the spam sparse matrix package
             # W[[m]] <- spam(c(wendland_basis(D, grid$radius[m])), nrow = nrow(D), ncol = ncol(D))
-            W[[m]] <- spam(D[c("ind", "ra")], nrow = D$da[1], ncol = D$da[2])
+            W[[m]] <- spam(D[c("ind", "basis")], nrow = D$da[1], ncol = D$da[2])
+            if (calc_derivative) {
+                dW[[m]] <- spam(D[c("ind", "dbasis")], nrow = D$da[1], ncol = D$da[2])
+                ddistx[[m]] <- spam(D[c("ind", "diffsx")], nrow = D$da[1], ncol = D$da[2])
+                ddisty[[m]] <- spam(D[c("ind", "diffsy")], nrow = D$da[1], ncol = D$da[2])
+
+            }
         } else {
             stop("The Matrix package is not currently supported")
             ## use the Matrix sparse matrix package
             W[[m]] <- Matrix(wendland_basis(D, grid$radius[m]), sparse = TRUE)
+            if (calc_derivative) {
+                # note: this code is not correct for Matrix package
+                dW[[m]] <- Matrix(dwendland_basis(D, grid$radius[m]), sparse = TRUE)
+                ddistx[[m]] <- Matrix(D[c("ind", "diffsx")], nrow = D$da[1], ncol = D$da[2], sparse = TRUE)
+                ddisty[[m]] <- Matrix(D[c("ind", "diffsy")], nrow = D$da[1], ncol = D$da[2], sparse = TRUE)
+
+            }
         }
     }
 
@@ -178,11 +207,18 @@ eval_basis <- function(
 
     ## flatten the list of basis functions W to a single matrix
     W <- do.call(cbind, W)
+    dW <- do.call(cbind, dW)
+    ddistx <- do.call(cbind, ddistx)
+    ddisty <- do.call(cbind, ddisty)
 
     out <- list(
         locs          = locs,
         locs_grid     = grid$locs_grid,
         W             = W,
+        dW            = dW,
+        ddistx        = ddistx,
+        ddisty        = ddisty,
+        D             = D,
         radius        = grid$radius,
         M             = M,
         n_dims        = n_dims,
