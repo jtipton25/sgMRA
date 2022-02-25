@@ -11,19 +11,20 @@ library(BayesMRA)
 library(patchwork)
 
 source("~/sgMRA/R/eval_basis.R")
+Rcpp::sourceCpp("~/sgMRA/src/dist_near_cpp.cpp")
 source("~/sgMRA/R/dwendland_basis.R")
 
-set.seed(44)
+set.seed(404)
 
 N <- 2^12
 M <- 1
 n_coarse_grid <- 80
 source("~/sgMRA/R/sim-deep-mra.R")
 dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.01)
-str(dat_sim)
+# str(dat_sim)
 length(dat_sim$MRA)
-str(dat_sim$alpha)
-str(dat_sim$alpha_x)
+# str(dat_sim$alpha)
+# str(dat_sim$alpha_x)
 
 locs <- dat_sim$locs
 z <- dat_sim$z
@@ -65,7 +66,7 @@ p_layers_sim
 # Fit the model using sgd ----
 source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 source("~/sgMRA/R/adam.R")
-n_iter = 1000
+n_iter = 200
 
 # add in Adam optimization schedule
 out <- fit_sgd(y=dat_sim$y,
@@ -77,37 +78,20 @@ out <- fit_sgd(y=dat_sim$y,
                # alpha_x1=NULL,
                alpha_y1=NULL,
                # alpha_y1=NULL,
-               alpha_x2=NULL,
-               alpha_y2=NULL,
-               learn_rate = 0.001,
+               alpha_x2=unlist(dat_sim$alpha_x[2]),
+               alpha_y2=unlist(dat_sim$alpha_y[2]),
+               learn_rate = 0.01,
                n_iter = n_iter,
                n_message = 1)
 
 plot(out$loss, type = 'l')
 
-# plot(out$alpha, alpha)
-# abline(0, 1, col = 'red')
-
-# plot first layer
-# plot(out$MRA$W %*% out$alpha, W %*% alpha)
-# abline(0, 1, col = 'red')
-
-# plot second layer x component
-# plot(out$MRA1$W %*% out$alpha_x1, W1 %*% alpha_x1)
-# abline(0, 1, col = 'red')
-
-# plot second layer y component
-# plot(out$MRA1$W %*% out$alpha_y1, W1 %*% alpha_y1)
-# abline(0, 1, col = 'red')
-
-# takes too long to plot
-
 # examine the fitted layers
 dat <- data.frame(x = locs$x, y = locs$y,
                   layer = rep(c(1, 1, 2, 2, 3), each=N),
                   group = rep(c("x", "y", "x", "y", "z"), each = N),
-                  z = c(out$MRA1$W %*% out$alpha_x1, out$MRA1$W %*% out$alpha_y1,
-                        out$MRA2$W %*% out$alpha_x2, out$MRA2$W %*% out$alpha_y2,
+                  z = c(out$MRA2$W %*% out$alpha_x2, out$MRA2$W %*% out$alpha_y2,
+                        out$MRA1$W %*% out$alpha_x1, out$MRA1$W %*% out$alpha_y1,
                         out$MRA$W %*% out$alpha))
 p_layers_fit <- ggplot(dat, aes(x, y, fill=z)) +
     geom_raster() +
@@ -115,15 +99,8 @@ p_layers_fit <- ggplot(dat, aes(x, y, fill=z)) +
     facet_grid(layer ~ group) +
     ggtitle("fitted layers")
 p_layers_sim / p_layers_fit
-# plot(out$sigma, type = 'l')
-# abline(h = sigma, col = 'red')
 
 
-# generate posterior mean surface
-# Walpha <- matrix(0, nrow(out$W[[1]]), ncol = length(out$sigma))
-# for (k in 1:length(out$sigma)) {
-#     Walpha[, k] <- drop(out$W[[k]] %*% out$alpha[k, ])
-# }
 
 dat <- data.frame(x = locs$x, y = locs$y,
                   z = z,
@@ -132,7 +109,7 @@ dat <- data.frame(x = locs$x, y = locs$y,
 p_fit <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +
     geom_raster() +
     scale_fill_viridis_c()
-p1 + p_fit
+p1 / p_fit
 
 
 dat <- data.frame(z = dat_sim$z,

@@ -26,24 +26,30 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
     # second layer
     delta_x1 <- delta * ((MRA$dW * MRA$ddistx) %*% alpha_x1)# check these
     delta_y1 <- delta * ((MRA$dW * MRA$ddisty) %*% alpha_y1)# check these
+    # delta_x1 <- delta * rowSums(MRA$dW * MRA$ddistx)# check these
+    # delta_y1 <- delta * rowSums(MRA$dW * MRA$ddisty)# check these
 
     # third layer
-    delta_x2 <- (delta_x1 + delta_y1) * ((MRA1$dW * MRA1$ddistx) %*% alpha_x2)# check these
-    delta_y2 <- (delta_x1 + delta_y1) * ((MRA1$dW * MRA1$ddisty) %*% alpha_y2)# check these
+    # delta_x2 <- (delta_x1 + delta_y1) * ((MRA1$dW * MRA1$ddistx) %*% alpha_x2)# check these
+    # delta_y2 <- (delta_x1 + delta_y1) * ((MRA1$dW * MRA1$ddisty) %*% alpha_y2)# check these
+    # delta_x2 <- (delta_x1 + delta_y1) * rowSums(MRA1$dW * MRA1$ddistx)# check these
+    # delta_y2 <- (delta_x1 + delta_y1) * rowSums(MRA1$dW * MRA1$ddisty)# check these
+
 
     # update the gradient with adam
     grad <- list(t(MRA$W) %*% delta + Q %*% alpha / N,
                  t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N,
-                 t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N,
-                 t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N,
-                 t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N)
+                 t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N)#,
+                 # t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N,
+                 # t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N)
+
 
     adam_out <- adam(i, grad, m, v)
     alpha    <- alpha    - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
     alpha_x1 <- alpha_x1 - learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon)
     alpha_y1 <- alpha_y1 - learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon)
-    alpha_x2 <- alpha_x2 - learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
-    alpha_y2 <- alpha_y2 - learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
+    # alpha_x2 <- alpha_x2 - learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
+    # alpha_y2 <- alpha_y2 - learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
 
 
     # # decaying learning rate
@@ -132,18 +138,20 @@ fit_sgd <- function(y, locs, grid,
     loss <- rep(NA, n_iter)
 
     # initialize adam optimization
-    m <- vector(mode='list', length = 5) # alpha, alpha_x1, and alpha_y1
-    v <- vector(mode='list', length = 5) # alpha, alpha_x1, and alpha_y1
+    m <- vector(mode='list', length = 3) # alpha, alpha_x1, and alpha_y1
+    v <- vector(mode='list', length = 3) # alpha, alpha_x1, and alpha_y1
+    # m <- vector(mode='list', length = 5) # alpha, alpha_x1, and alpha_y1
+    # v <- vector(mode='list', length = 5) # alpha, alpha_x1, and alpha_y1
     m[[1]] <- rep(0, length(alpha))
     m[[2]] <- rep(0, length(alpha_x1))
     m[[3]] <- rep(0, length(alpha_y1))
-    m[[4]] <- rep(0, length(alpha_x2))
-    m[[5]] <- rep(0, length(alpha_y2))
+    # m[[4]] <- rep(0, length(alpha_x2))
+    # m[[5]] <- rep(0, length(alpha_y2))
     v[[1]] <- rep(0, length(alpha))
     v[[2]] <- rep(0, length(alpha_x1))
     v[[3]] <- rep(0, length(alpha_y1))
-    v[[4]] <- rep(0, length(alpha_x2))
-    v[[5]] <- rep(0, length(alpha_y2))
+    # v[[4]] <- rep(0, length(alpha_x2))
+    # v[[5]] <- rep(0, length(alpha_y2))
 
     for (i in 1:n_iter) {
 
