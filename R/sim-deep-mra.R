@@ -34,8 +34,10 @@ sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
     # initialize the middle layers
     if (n_layers > 1) {
         for (j in n_layers:2) {
-            alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
-            alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
+            alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 1)
+            alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 1)
+            # alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
+            # alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
 
             MRA[[j-1]] <- eval_basis(cbind(MRA[[j]]$W %*% alpha_x[[j-1]], MRA[[j]]$W %*% alpha_y[[j-1]]), grid)
             Q[[j-1]] <- make_Q_alpha_2d(sqrt(MRA[[j-1]]$n_dims),
@@ -46,38 +48,12 @@ sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
             class(Q[[j-1]]) <- "spam"
         }
     }
-    #      } else  if (n_layers > 2) {
-    #
-    #     # the second bottom layer
-    #     # if (is.null(alpha_x[[n_layers-1]])) {
-    #     alpha_x[[n_layers-1]] <- rnorm(ncol(MRA[[n_layers]]$W), 0, 0.1)
-    #     # }
-    #     # if (is.null(alpha_y[[n_layers-1]])) {
-    #     alpha_y[[n_layers-1]] <- rnorm(ncol(MRA[[n_layers]]$W), 0, 0.1)
-    #     # }
-    #
-    #     for (j in (n_layers-1):2) {
-    #         MRA[[j]] <- eval_basis(cbind(MRA[[j+1]]$W %*% alpha_x[[j]], MRA[[j+1]]$W %*% alpha_y[[j]]), grid)
-    #         Q[[j]] <- make_Q_alpha_2d(sqrt(MRA[[j]]$n_dims),
-    #                                   phi=rep(0.9, length(MRA[[j]]$n_dims)))
-    #         if (length(MRA[[j]]$n_dims) > 1) {
-    #             Q[[j]] <- do.call(bdiag.spam, Q[[j]])
-    #         }
-    #         class(Q[[j]]) <- "spam"
-    #
-    #         # if (is.null(alpha_x[[j-1]])) {
-    #         alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
-    #         # }
-    #         # if (is.null(alpha_y[[j-1]])) {
-    #         alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
-    #         # }
-    #     }
-    # }
 
     # initialize the top layer
 
     # if (is.null(alpha)) {
-    alpha <- rnorm(ncol(MRA[[1]]$W), 0, 0.1)
+    # alpha <- rnorm(ncol(MRA[[1]]$W), 0, 0.1)
+    alpha <- rnorm(ncol(MRA[[1]]$W), 0, 1)
     # }
 
     z <- MRA[[1]]$W %*% alpha

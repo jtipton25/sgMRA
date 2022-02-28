@@ -11,10 +11,11 @@ library(BayesMRA)
 library(patchwork)
 
 source("~/sgMRA/R/eval_basis.R")
+Rcpp::sourceCpp("~/sgMRA/src/dist_near_cpp.cpp")
 source("~/sgMRA/R/dwendland_basis.R")
 
 set.seed(44)
-N <- 2^8
+N <- 2^12
 locs <- expand_grid(x=seq(0, 1, length.out=sqrt(N)),
                     y=seq(0, 1, length.out=sqrt(N)))
 
@@ -28,7 +29,7 @@ z[idx3] <- z[idx3] + sin(16*pi*locs$x[idx3]) * sin(16*pi*locs$y[idx3])
 
 
 
-M <- 1
+M <- 2
 n_coarse_grid <- 20
 
 grid <- make_grid(locs, M = M, n_coarse_grid = n_coarse_grid)
@@ -71,28 +72,40 @@ p1 + p2
 # Fit the model using sgd ----
 source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 source("~/sgMRA/R/adam.R")
-n_iter = 10000
-rate_schedule = rep(seq(0.25, 0.01, length = 100), each = ceiling(n_iter / 100))
+n_iter = 400
 
 # add in Adam optimization schedule
 # profvis::profvis(
-system.time(
+# system.time(
     out <- fit_sgd(y = y, locs = locs, grid = grid,
-               alpha=NULL,
-               # alpha=alpha,
-               alpha_x1=NULL,
-               # alpha_x1=NULL,
-               alpha_y1=NULL,
-               # alpha_y1=NULL,
-               # alpha_x2=NULL,
-               # # alpha_x2=NULL,
-               # alpha_y2=NULL,
-               # # alpha_y2=NULL,
-               learn_rate = 0.01,
-               # rate_schedule = rate_schedule,
-               n_iter = n_iter,
-               n_message = 100)
-)
+                   alpha=NULL,
+                   alpha_x1=NULL,
+                   alpha_y1=NULL,
+                   alpha_x2=NULL,
+                   alpha_y2=NULL,
+                   # alpha=alpha,
+                   # alpha_x1=alpha_x1,
+                   # alpha_y1=alpha_y1,
+                   # alpha_x2=alpha_x2,
+                   # alpha_y2=alpha_y2,
+                   learn_rate = 0.1,
+
+                   n_iter = n_iter,
+                   n_message = 10,
+                   penalized=FALSE)
+
+    # )
+    # resume the GD with last model fit
+    out <- fit_sgd(y = y, locs = locs, grid = grid,
+                   alpha=out$alpha,
+                   alpha_x1=out$alpha_x1,
+                   alpha_y1=out$alpha_y1,
+                   alpha_x2=out$alpha_x2,
+                   alpha_y2=out$alpha_y2,
+                   learn_rate = 0.1,
+                   n_iter = n_iter,
+                   n_message = 10,
+                   penalized=TRUE)
 # M=1, n_coarse_grid=10, layers = 3, fit-time:  elapsed, loss:
 # M=1, n_coarse_grid=10, layers = 2, fit-time: 364.731 elapsed, loss: 0.32
 # M=2, n_coarse_grid=30, layers = 2, fit-time: 1178.980 elapsed, loss: 0.0741
@@ -103,12 +116,12 @@ plot(out$loss, type = 'l')
 
 # examine the fitted layers
 dat <- data.frame(x = locs$x, y = locs$y,
-                  # layer = rep(c(1, 1, 2, 2, 3), each=N),
-                  layer = rep(c(1, 1, 2), each=N),
-                  group = rep(c("x", "y", "z"), each = N),
-                  # group = rep(c("x", "y", "x", "y", "z"), each = N),
-                  z = c(out$MRA1$W %*% out$alpha_x1, out$MRA1$W %*% out$alpha_y1,
-                        # out$MRA2$W %*% out$alpha_x2, out$MRA2$W %*% out$alpha_y2,
+                  # layer = rep(c(1, 1, 2), each=N),
+                  # group = rep(c("x", "y", "z"), each = N),
+                  layer = rep(c(1, 1, 2, 2, 3), each=N),
+                  group = rep(c("x", "y", "x", "y", "z"), each = N),
+                  z = c(out$MRA2$W %*% out$alpha_x2, out$MRA2$W %*% out$alpha_y2,
+                        out$MRA1$W %*% out$alpha_x1, out$MRA1$W %*% out$alpha_y1,
                         out$MRA$W %*% out$alpha))
 # plot_func <- function(df, name) {
 #     ggplot(data = df, aes(x = x, y = y, fill = z)) +
@@ -138,7 +151,7 @@ p_fit <- dat %>%
     scale_fill_viridis_c() +
     ggtitle("fitted process")
 
-p1 + p_fit
+p1 / p_fit
 # plot(out$sigma, type = 'l')
 # abline(h = sigma, col = 'red')
 
@@ -153,13 +166,13 @@ dat <- data.frame(x = locs$x, y = locs$y,
                   z = z,
                   z_fit = out$MRA$W %*% out$alpha)
 
-p3 <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +
-    geom_raster() +
-    scale_fill_viridis_c()
-p4 <- ggplot(dat, aes(x = x, y = y, fill = z_fit - z)) +
-    geom_raster() +
-    scale_fill_viridis_c()
-p1 + p3 + p4
+# p3 <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +
+#     geom_raster() +
+#     scale_fill_viridis_c()
+# p4 <- ggplot(dat, aes(x = x, y = y, fill = z_fit - z)) +
+#     geom_raster() +
+#     scale_fill_viridis_c()
+# p1 + p3 + p4
 
 
 dat <- data.frame(z = z,
@@ -173,4 +186,4 @@ p5
 cor(dat$z, dat$z_fit)
 
 # view object memory
-lapply(out,  function(x) {format(object.size(x), units="MB")})
+# lapply(out,  function(x) {format(object.size(x), units="MB")})

@@ -9,7 +9,8 @@ Rcpp::List distance_near_with_ddist_cpp(arma::mat& locs, arma::mat& locs_grid, d
     int N = locs.n_rows;
     int N_grid = locs_grid.n_rows;
 
-    int max_points = 2 * n_neighbors * N_grid;
+    // figure out a smart way of dealing with this
+    int max_points = 2 * n_neighbors * N;
 
 
     // initialize storage vector
@@ -29,15 +30,10 @@ Rcpp::List distance_near_with_ddist_cpp(arma::mat& locs, arma::mat& locs_grid, d
             if ((value <= radius) & (value > 0)) {
                 I(idx) = i + 1;
                 J(idx) = j + 1;
-                // // fill in the symmetrical distance
-                // I(idx+1) = j;
-                // J(idx + 1) = i;
                 V(idx) = value;
                 ddistx(idx) = (locs(i, 0) - locs_grid(j, 0)) / value;
                 ddisty(idx) = (locs(i, 1) - locs_grid(j, 1)) / value;
-                // V(idx+1) = value;
                 idx += 1;
-                // idx += 2;
             }
         }
     }

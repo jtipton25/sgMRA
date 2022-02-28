@@ -152,13 +152,9 @@ eval_basis <- function(
     for (m in 1:M) {
 
 
-        # rewrite this to include dW and ddist functions for more efficiency
-        # D <- fields::fields.rdist.near(locs,
-        #                                grid$locs_grid[[m]],
-        #                                delta = grid$radius[m],
-        #                                max.points = max_points)
-        #
-        # D$basis <- make_basis(D$ra, grid$radius[m], basis_type = "wendland")
+        # rewriten to include dW and ddist functions for more efficiency,
+        # TODO: rewrite to include basis and dbasis
+
 
         D <- distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
                                           radius = grid$radius[m],
@@ -166,39 +162,24 @@ eval_basis <- function(
         D$basis <- make_basis(D$V, grid$radius[m], basis_type='wendland')
         D$dbasis <- dwendland_basis(D$V, grid$radius[m])
 
-        # if (calc_derivative) {
-
-            # Note: this will likely fail for multiple resolutions
-
-            # diffs <- 2*(locs[D$ind[, 1], ] - grid$locs_grid[[m]][D$ind[, 2], ]) # i think this is wrong because it doesn't include the square root
-            # D$diffsx <- diffs[[1]]
-            # D$diffsy <- -diffs[[2]]
-            # see https://www.wolframalpha.com/input?i=d%2Fdx+sqrt%28x%5E2+%2B++y%5E2%29
-            # diffs <- locs[D$ind[, 1], ] - grid$locs_grid[[m]][D$ind[, 2], ]
-            # D$diffsx <- diffs[[1]] / D$ra
-            # D$diffsy <- diffs[[2]] / D$ra
-        # }
+        N_grid <- nrow(grid$locs_grid[[m]])
 
         if (use_spam) {
             ## use the spam sparse matrix package
-            # W[[m]] <- spam(c(wendland_basis(D, grid$radius[m])), nrow = nrow(D), ncol = ncol(D))
-            # W[[m]] <- spam(D[c("ind", "basis")], nrow = D$da[1], ncol = D$da[2])
-            W[[m]] <- spam(D[c('ind', 'basis')], nrow =N, ncol = nrow(grid$locs_grid[[m]]))
-            # if (calc_derivative) {
-            dW[[m]] <- spam(D[c("ind", "dbasis")], nrow = N, ncol = nrow(grid$locs_grid[[m]]))
-            ddistx[[m]] <- spam(D[c("ind", "ddistx")], nrow = N, ncol = nrow(grid$locs_grid[[m]]))
-            ddisty[[m]] <- spam(D[c("ind", "ddisty")], nrow = N, ncol = nrow(grid$locs_grid[[m]]))
+            W[[m]] <- spam(D[c('ind', 'basis')], nrow =N, ncol = N_grid)
+            dW[[m]] <- spam(D[c("ind", "dbasis")], nrow = N, ncol = N_grid)
+            ddistx[[m]] <- spam(D[c("ind", "ddistx")], nrow = N, ncol = N_grid)
+            ddisty[[m]] <- spam(D[c("ind", "ddisty")], nrow = N, ncol = N_grid)
 
             # }
         } else {
             stop("The Matrix package is not currently supported")
             ## use the Matrix sparse matrix package
             W[[m]] <- Matrix(wendland_basis(D, grid$radius[m]), sparse = TRUE)
-            # if (calc_derivative) {
             # note: this code is not correct for Matrix package
             dW[[m]] <- Matrix(dwendland_basis(D, grid$radius[m]), sparse = TRUE)
-            ddistx[[m]] <- Matrix(D[c("ind", "ddistx")], nrow = D$da[1], ncol = nrow(grid$locs_grid[[m]]), sparse = TRUE)
-            ddisty[[m]] <- Matrix(D[c("ind", "ddisty")], nrow = D$da[1], ncol = nrow(grid$locs_grid[[m]]), sparse = TRUE)
+            ddistx[[m]] <- Matrix(D[c("ind", "ddistx")], nrow = N, ncol = N_grid, sparse = TRUE)
+            ddisty[[m]] <- Matrix(D[c("ind", "ddisty")], nrow = N, ncol = N_grid, sparse = TRUE)
 
             # }
         }

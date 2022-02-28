@@ -17,57 +17,47 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             Q2,
                             i,
                             m, v,
-                            learn_rate) {
+                            learn_rate,
+                            penalized) {
 
     N <- length(y)
-    # first layer
+    # first layer w.r.t alpha
     delta <- drop(- 1/N * (y - MRA$W %*% alpha))
+    # first layer w.r.t W
+    delta_W <- (2 / N * (MRA$W %*% alpha - y)) %*% t(alpha)
 
     # second layer
-    delta_x1 <- delta * ((MRA$dW * MRA$ddistx) %*% alpha_x1)# check these
-    delta_y1 <- delta * ((MRA$dW * MRA$ddisty) %*% alpha_y1)# check these
-    # delta_x1 <- delta * rowSums(MRA$dW * MRA$ddistx)# check these
-    # delta_y1 <- delta * rowSums(MRA$dW * MRA$ddisty)# check these
+    delta_x1 <- rowSums(delta_W * (MRA$dW * MRA$ddistx))
+    delta_y1 <- rowSums(delta_W * (MRA$dW * MRA$ddisty))
 
     # third layer
-    # delta_x2 <- (delta_x1 + delta_y1) * ((MRA1$dW * MRA1$ddistx) %*% alpha_x2)# check these
-    # delta_y2 <- (delta_x1 + delta_y1) * ((MRA1$dW * MRA1$ddisty) %*% alpha_y2)# check these
-    # delta_x2 <- (delta_x1 + delta_y1) * rowSums(MRA1$dW * MRA1$ddistx)# check these
-    # delta_y2 <- (delta_x1 + delta_y1) * rowSums(MRA1$dW * MRA1$ddisty)# check these
+    delta2 <- delta_x1 %*% t(alpha_x1) + delta_y1 %*% t(alpha_y1) # chain rule gradient tape
+    delta_x2 <- rowSums(delta2 * MRA1$dW * MRA1$ddistx)
+    delta_y2 <- rowSums(delta2 * MRA1$dW * MRA1$ddisty)
 
-
-    # update the gradient with adam
-    grad <- list(t(MRA$W) %*% delta + Q %*% alpha / N,
-                 t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N,
-                 t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N)#,
-                 # t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N,
-                 # t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N)
-
+    # update the gradient with adam with a penalty
+    if (penalized) {
+        grad <- list(t(MRA$W) %*% delta + Q %*% alpha / N,
+                     t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N,
+                     t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N,
+                     t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N,
+                     t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N)
+    } else {
+        # update the gradient without a penalty term
+        grad <- list(t(MRA$W) %*% delta,
+                     t(MRA1$W) %*% delta_x1,
+                     t(MRA1$W) %*% delta_y1,
+                     t(MRA2$W) %*% delta_x2,
+                     t(MRA2$W) %*% delta_y2)
+    }
 
     adam_out <- adam(i, grad, m, v)
     alpha    <- alpha    - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
     alpha_x1 <- alpha_x1 - learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon)
     alpha_y1 <- alpha_y1 - learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon)
-    # alpha_x2 <- alpha_x2 - learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
-    # alpha_y2 <- alpha_y2 - learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
+    alpha_x2 <- alpha_x2 - learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
+    alpha_y2 <- alpha_y2 - learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
 
-
-    # # decaying learning rate
-    # alpha <- alpha - learn_rate * (t(MRA$W) %*% delta + Q %*% alpha / N)
-    # alpha_x1 <- alpha_x1 - learn_rate * (t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N)
-    # alpha_y1 <- alpha_y1 - learn_rate * (t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1)
-
-    # alpha <- alpha - learn_rate * (t(MRA$W) %*% delta)
-    # alpha_x1 <- alpha_x1 - learn_rate * (t(MRA1$W) %*% delta_x1)
-    # alpha_y1 <- alpha_y1 - learn_rate * (t(MRA1$W) %*% delta_y1)
-    # # alpha_x2 <-
-    #     alpha_x2 - learn_rate * t(MRA2$W) %*% delta_x2
-    # # alpha_y2 <-
-    #     alpha_y2 - learn_rate * t(MRA2$W) %*% delta_y2
-    # # alpha_x1 <-
-    #     alpha_x1 - learn_rate * t(MRA1$W) %*% delta_x1
-    # # alpha_y1 <-
-    #     alpha_y1 - learn_rate * t(MRA1$W) %*% delta_y1
 
     # the forward pass on the sgMRA
     MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid)
@@ -88,7 +78,8 @@ fit_sgd <- function(y, locs, grid,
                     alpha_x2 = NULL,
                     alpha_y2 = NULL,
                     learn_rate, n_iter=500,
-                    n_message = 50) {
+                    n_message = 50,
+                    penalized = FALSE) {
 
 
     N <- length(y)
@@ -102,10 +93,12 @@ fit_sgd <- function(y, locs, grid,
     }
     class(Q2) <- "spam"
     if (is.null(alpha_x2)) {
-        alpha_x2 <- rnorm(ncol(MRA2$W), 0, 0.1)
+        # alpha_x2 <- rnorm(ncol(MRA2$W), 0, 0.1)
+        alpha_x2 <- rnorm(ncol(MRA2$W), 0, 1)
     }
     if (is.null(alpha_y2)) {
-        alpha_y2 <- rnorm(ncol(MRA2$W), 0, 0.1)
+        # alpha_y2 <- rnorm(ncol(MRA2$W), 0, 0.1)
+        alpha_y2 <- rnorm(ncol(MRA2$W), 0, 1)
     }
 
 
@@ -117,10 +110,12 @@ fit_sgd <- function(y, locs, grid,
     class(Q1) <- "spam"
 
     if (is.null(alpha_x1)) {
-        alpha_x1 <- rnorm(ncol(MRA1$W), 0, 0.1)
+        # alpha_x1 <- rnorm(ncol(MRA1$W), 0, 0.1)
+        alpha_x1 <- rnorm(ncol(MRA1$W), 0, 1)
     }
     if (is.null(alpha_y1)) {
-        alpha_y1 <- rnorm(ncol(MRA1$W), 0, 0.1)
+        # alpha_y1 <- rnorm(ncol(MRA1$W), 0, 0.1)
+        alpha_y1 <- rnorm(ncol(MRA1$W), 0, 1)
     }
 
     MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid)
@@ -131,27 +126,31 @@ fit_sgd <- function(y, locs, grid,
     class(Q) <- "spam"
 
     if (is.null(alpha)) {
-        alpha <- rnorm(ncol(MRA$W), 0, 0.1)
+        # alpha <- rnorm(ncol(MRA$W), 0, 0.1)
+        alpha <- rnorm(ncol(MRA$W), 0, 1)
     }
 
     # initialize the loss
     loss <- rep(NA, n_iter)
 
+    message("Initializing the model, the initialization loss is = ", 1 / N * sum((y - MRA$W %*% alpha)^2))
+    message("Fitting the model for ", n_iter, " iterations")
+
     # initialize adam optimization
-    m <- vector(mode='list', length = 3) # alpha, alpha_x1, and alpha_y1
-    v <- vector(mode='list', length = 3) # alpha, alpha_x1, and alpha_y1
-    # m <- vector(mode='list', length = 5) # alpha, alpha_x1, and alpha_y1
-    # v <- vector(mode='list', length = 5) # alpha, alpha_x1, and alpha_y1
+    # m <- vector(mode='list', length = 3) # alpha, alpha_x1, and alpha_y1
+    # v <- vector(mode='list', length = 3) # alpha, alpha_x1, and alpha_y1
+    m <- vector(mode='list', length = 5)
+    v <- vector(mode='list', length = 5)
     m[[1]] <- rep(0, length(alpha))
     m[[2]] <- rep(0, length(alpha_x1))
     m[[3]] <- rep(0, length(alpha_y1))
-    # m[[4]] <- rep(0, length(alpha_x2))
-    # m[[5]] <- rep(0, length(alpha_y2))
-    v[[1]] <- rep(0, length(alpha))
-    v[[2]] <- rep(0, length(alpha_x1))
-    v[[3]] <- rep(0, length(alpha_y1))
-    # v[[4]] <- rep(0, length(alpha_x2))
-    # v[[5]] <- rep(0, length(alpha_y2))
+    m[[4]] <- rep(0, length(alpha_x2))
+    m[[5]] <- rep(0, length(alpha_y2))
+    v[[1]] <- rep(0.01, length(alpha))
+    v[[2]] <- rep(0.01, length(alpha_x1))
+    v[[3]] <- rep(0.01, length(alpha_y1))
+    v[[4]] <- rep(0.01, length(alpha_x2))
+    v[[5]] <- rep(0.01, length(alpha_y2))
 
     for (i in 1:n_iter) {
 
@@ -160,11 +159,11 @@ fit_sgd <- function(y, locs, grid,
                                 alpha,
                                 alpha_x1, alpha_y1,
                                 alpha_x2, alpha_y2,
-                                # alpha_x2, alpha_y2,
                                 Q, Q1, Q2,
                                 i,
                                 m, v,
-                                learn_rate)
+                                learn_rate,
+                                penalized)
         alpha <- pars$alpha
         alpha_x1 <- pars$alpha_x1
         alpha_y1 <- pars$alpha_y1

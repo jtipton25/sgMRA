@@ -1,5 +1,10 @@
 # TODO
 # - work on fitting these using stochastic gradient descent or elliptical slice sampling
+# - fast sparse distances: https://stackoverflow.com/questions/5560218/computing-sparse-pairwise-distance-matrix-in-r
+# - in python: https://stackoverflow.com/questions/56889635/is-there-a-better-and-faster-way-to-convert-from-scipy-condensed-distance-matrix
+#       - python/Julia pdist: https://stackoverflow.com/questions/66237199/alternate-approach-for-pdist-from-scipy-in-julia
+#       - Julia pdist
+# - speedup MRA building function as this seems to be limiting the sgMRA
 
 
 # Deep BayesMRA
@@ -17,14 +22,34 @@ source("~/sgMRA/R/dwendland_basis.R")
 set.seed(404)
 
 N <- 2^12
-M <- 1
-n_coarse_grid <- 80
+
+M <- 3
+n_coarse_grid <- 10#20
+# N <- 2^12
+# M <- 1
+# n_coarse_grid <- 80
 source("~/sgMRA/R/sim-deep-mra.R")
-dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.01)
-# str(dat_sim)
-length(dat_sim$MRA)
-# str(dat_sim$alpha)
-# str(dat_sim$alpha_x)
+dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.1)
+
+y=dat_sim$y
+MRA=dat_sim$MRA[[1]]
+MRA1=dat_sim$MRA[[2]]
+MRA2=dat_sim$MRA[[3]]
+W = MRA$W
+W1 = MRA1$W
+W2 = MRA2$W
+dW = MRA$dW
+dW1 = MRA1$dW
+ddistx = MRA$ddistx
+ddistx2 = MRA1$ddistx
+ddisty = MRA$ddisty
+ddisty2 = MRA1$ddisty
+
+alpha=dat_sim$alpha
+alpha_x1=dat_sim$alpha_x[[1]]
+alpha_y1=dat_sim$alpha_y[[1]]
+alpha_x2=dat_sim$alpha_x[[2]]
+alpha_y2=dat_sim$alpha_y[[2]]
 
 locs <- dat_sim$locs
 z <- dat_sim$z
@@ -41,18 +66,20 @@ p2 <- ggplot(dat, aes(x = x, y = y, fill = y_obs)) +
     geom_raster() +
     scale_fill_viridis_c()
 
-p1 + p2
+p1 / p2
 
 
 # make this into a function
 dat <- data.frame(x = locs$x, y = locs$y,
                   layer = rep(c(1, 1, 2, 2, 3), each=N),
-                  # layer = rep(c(1, 1, 2), each=N),
-                  # group = rep(c("x", "y", "z"), each = N),
                   group = rep(c("x", "y", "x", "y", "z"), each = N),
                   z = c(dat_sim$MRA[[3]]$W %*% dat_sim$alpha_x[[2]], dat_sim$MRA[[3]]$W %*% dat_sim$alpha_y[[2]],
                         dat_sim$MRA[[2]]$W %*% dat_sim$alpha_x[[1]], dat_sim$MRA[[2]]$W %*% dat_sim$alpha_y[[1]],
                         dat_sim$MRA[[1]]$W %*% dat_sim$alpha))
+                  # layer = rep(c(1, 1, 2), each=N),
+                  # group = rep(c("x", "y", "z"), each = N),
+                  # z = c(dat_sim$MRA[[2]]$W %*% dat_sim$alpha_x[[1]], dat_sim$MRA[[2]]$W %*% dat_sim$alpha_y[[1]],
+                  #       dat_sim$MRA[[1]]$W %*% dat_sim$alpha))
 
 
 p_layers_sim <- ggplot(dat, aes(x, y, fill=z)) +
@@ -63,6 +90,9 @@ p_layers_sim <- ggplot(dat, aes(x, y, fill=z)) +
 
 p_layers_sim
 
+# log-likelihood
+1 / N * sum((dat_sim$y - dat_sim$MRA[[1]]$W %*% dat_sim$alpha)^2)
+
 # Fit the model using sgd ----
 source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 source("~/sgMRA/R/adam.R")
@@ -72,18 +102,35 @@ n_iter = 200
 out <- fit_sgd(y=dat_sim$y,
                locs=dat_sim$locs,
                grid=dat_sim$grid,
-               # alpha=alpha,
                alpha=NULL,
                alpha_x1=NULL,
-               # alpha_x1=NULL,
                alpha_y1=NULL,
-               # alpha_y1=NULL,
-               alpha_x2=unlist(dat_sim$alpha_x[2]),
-               alpha_y2=unlist(dat_sim$alpha_y[2]),
-               learn_rate = 0.01,
+               alpha_x2=NULL,
+               alpha_y2=NULL,
+               # alpha=alpha,
+               # alpha_x1=alpha_x1,
+               # alpha_y1=alpha_y1,
+               # alpha_x2=alpha_x2,
+               # alpha_y2=alpha_y2,
+               learn_rate = 0.1,
                n_iter = n_iter,
-               n_message = 1)
+               n_message = 1,
+               penalized = FALSE)
 
+# re-fit the model with the current state to continue the learning
+
+out <- fit_sgd(y=dat_sim$y,
+               locs=dat_sim$locs,
+               grid=dat_sim$grid,
+               alpha=out$alpha,
+               alpha_x1=out$alpha_x1,
+               alpha_y1=out$alpha_y1,
+               alpha_x2=out$alpha_x2,
+               alpha_y2=out$alpha_y2,
+               learn_rate = 0.1,
+               n_iter = n_iter,
+               n_message = 1,
+               penalized=TRUE)
 plot(out$loss, type = 'l')
 
 # examine the fitted layers
@@ -112,8 +159,8 @@ p_fit <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +
 p1 / p_fit
 
 
-dat <- data.frame(z = dat_sim$z,
-                  z_fit = out$MRA$W %*% out$alpha)
+# dat <- data.frame(z = dat_sim$z,
+#                   z_fit = out$MRA$W %*% out$alpha)
 p5 <- ggplot(dat, aes(x = z, y = z_fit)) +
     geom_point() +
     stat_smooth(method = 'lm')
@@ -121,6 +168,17 @@ p5
 
 
 cor(dat$z, dat$z_fit)
+
+
+p_resid <- ggplot(dat, aes(x = x, y = y, fill = z-z_fit)) +
+    geom_raster() +
+    scale_fill_viridis_c()
+p_resid
+
+dat %>%
+    mutate(resid = z - z_fit) %>%
+    summarize(rmse=sd(resid))
+
 
 # view object memory
 lapply(out,  function(x) {format(object.size(x), units="MB")})
