@@ -24,7 +24,7 @@ set.seed(404)
 N <- 2^12
 
 M <- 3
-n_coarse_grid <- 10#20
+n_coarse_grid <- 30
 # N <- 2^12
 # M <- 1
 # n_coarse_grid <- 80

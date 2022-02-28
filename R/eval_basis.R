@@ -173,14 +173,11 @@ eval_basis <- function(
 
             # }
         } else {
-            stop("The Matrix package is not currently supported")
-            ## use the Matrix sparse matrix package
-            W[[m]] <- Matrix(wendland_basis(D, grid$radius[m]), sparse = TRUE)
-            # note: this code is not correct for Matrix package
-            dW[[m]] <- Matrix(dwendland_basis(D, grid$radius[m]), sparse = TRUE)
-            ddistx[[m]] <- Matrix(D[c("ind", "ddistx")], nrow = N, ncol = N_grid, sparse = TRUE)
-            ddisty[[m]] <- Matrix(D[c("ind", "ddisty")], nrow = N, ncol = N_grid, sparse = TRUE)
-
+            # stop("The Matrix package is not currently supported")
+            W[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$basis), dims = c(N, N_grid))
+            dW[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$dbasis), dims = c(N, N_grid))
+            ddistx[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$ddistx), dims = c(N, N_grid))
+            ddisty[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$ddisty), dims = c(N, N_grid))
             # }
         }
     }

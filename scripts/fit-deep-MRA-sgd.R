@@ -79,7 +79,8 @@ fit_sgd <- function(y, locs, grid,
                     alpha_y2 = NULL,
                     learn_rate, n_iter=500,
                     n_message = 50,
-                    penalized = FALSE) {
+                    penalized = FALSE,
+                    plot_during_fit = FALSE) {
 
 
     N <- length(y)
@@ -89,51 +90,86 @@ fit_sgd <- function(y, locs, grid,
     MRA2 <- eval_basis(locs, grid)
     Q2 <- make_Q_alpha_2d(sqrt(MRA2$n_dims), phi=rep(0.9, length(MRA2$n_dims)))
     if (length(MRA2$n_dims) > 1) {
+        for (m in 1:M){
+            Q2[[m]] <- 2^(2*(m-1)) * Q2[[m]]
+        }
         Q2 <- do.call(bdiag.spam, Q2)
     }
     class(Q2) <- "spam"
+
     if (is.null(alpha_x2)) {
         # alpha_x2 <- rnorm(ncol(MRA2$W), 0, 0.1)
-        alpha_x2 <- rnorm(ncol(MRA2$W), 0, 1)
+        # alpha_x2 <- rnorm(ncol(MRA2$W), 0, 1)
+        alpha_x2 <- drop(rmvnorm.prec(1, rep(0, ncol(MRA2$W)), Q2)) * 0.1
     }
     if (is.null(alpha_y2)) {
         # alpha_y2 <- rnorm(ncol(MRA2$W), 0, 0.1)
-        alpha_y2 <- rnorm(ncol(MRA2$W), 0, 1)
+        # alpha_y2 <- rnorm(ncol(MRA2$W), 0, 1)
+        alpha_y2 <- drop(rmvnorm.prec(1, rep(0, ncol(MRA2$W)), Q2)) * 0.1
     }
 
 
     MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid)
     Q1 <- make_Q_alpha_2d(sqrt(MRA1$n_dims), phi=rep(0.9, length(MRA1$n_dims)))
     if (length(MRA1$n_dims) > 1) {
+        for (m in 1:M){
+            Q1[[m]] <- 2^(2*(m-1)) * Q1[[m]]
+        }
         Q1 <- do.call(bdiag.spam, Q1)
     }
     class(Q1) <- "spam"
 
     if (is.null(alpha_x1)) {
         # alpha_x1 <- rnorm(ncol(MRA1$W), 0, 0.1)
-        alpha_x1 <- rnorm(ncol(MRA1$W), 0, 1)
+        # alpha_x1 <- rnorm(ncol(MRA1$W), 0, 1)
+        alpha_x1 <- drop(rmvnorm.prec(1, rep(0, ncol(MRA1$W)), Q1)) * 0.1
     }
     if (is.null(alpha_y1)) {
         # alpha_y1 <- rnorm(ncol(MRA1$W), 0, 0.1)
-        alpha_y1 <- rnorm(ncol(MRA1$W), 0, 1)
+        # alpha_y1 <- rnorm(ncol(MRA1$W), 0, 1)
+        alpha_y1 <- drop(rmvnorm.prec(1, rep(0, ncol(MRA1$W)), Q1)) * 0.1
     }
 
     MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid)
     Q <- make_Q_alpha_2d(sqrt(MRA$n_dims), phi=rep(0.9, length(MRA1$n_dims)))
     if (length(MRA$n_dims) > 1) {
+        for (m in 1:M){
+            Q[[m]] <- 2^(2*(m-1)) * Q[[m]]
+        }
         Q <- do.call(bdiag.spam, Q)
     }
     class(Q) <- "spam"
 
     if (is.null(alpha)) {
         # alpha <- rnorm(ncol(MRA$W), 0, 0.1)
-        alpha <- rnorm(ncol(MRA$W), 0, 1)
+        # alpha <- rnorm(ncol(MRA$W), 0, 1)
+        alpha <- drop(rmvnorm.prec(1, rep(0, ncol(MRA$W)), Q)) * 0.1
     }
 
     # initialize the loss
     loss <- rep(NA, n_iter)
 
     message("Initializing the model, the initialization loss is = ", 1 / N * sum((y - MRA$W %*% alpha)^2))
+
+    # plot the data
+    if (plot_during_fit) {
+        dat <- data.frame(x = locs$x, y = locs$y, z = z, y_obs = y_obs)
+        p1 <- ggplot(dat, aes(x = x, y = y, fill = z)) +
+            geom_raster() +
+            scale_fill_viridis_c()
+        dat <- data.frame(x = locs$x, y = locs$y,
+                          layer = rep(c(1, 1, 2, 2, 3), each=N),
+                          group = rep(c("x", "y", "x", "y", "z"), each = N),
+                          z = c(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2,
+                                MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1,
+                                MRA$W %*% alpha))
+        p_layers_fit <- ggplot(dat, aes(x, y, fill=z)) +
+            geom_raster() +
+            scale_fill_viridis_c() +
+            facet_grid(layer ~ group) +
+            ggtitle("initialized fitted layers")
+        print(p_layers_fit / p1)
+    }
     message("Fitting the model for ", n_iter, " iterations")
 
     # initialize adam optimization
@@ -177,6 +213,22 @@ fit_sgd <- function(y, locs, grid,
         loss[i] <- 1 / N * sum((y - MRA$W %*% alpha)^2)
         if (i %% n_message == 0) {
             message("iteration i = ", i, " loss = ", loss[i])
+            if (plot_during_fit) {
+                # examine the fitted layers
+                dat <- data.frame(x = locs$x, y = locs$y,
+                                  layer = rep(c(1, 1, 2, 2, 3), each=N),
+                                  group = rep(c("x", "y", "x", "y", "z"), each = N),
+                                  z = c(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2,
+                                        MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1,
+                                        MRA$W %*% alpha))
+                p_layers_fit <- ggplot(dat, aes(x, y, fill=z)) +
+                    geom_raster() +
+                    scale_fill_viridis_c() +
+                    facet_grid(layer ~ group) +
+                    ggtitle(paste0("fitted layers, iteration ", i))
+                print(p_layers_fit / p1)
+            }
+
         }
     }
 

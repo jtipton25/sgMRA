@@ -29,8 +29,8 @@ z[idx3] <- z[idx3] + sin(16*pi*locs$x[idx3]) * sin(16*pi*locs$y[idx3])
 
 
 
-M <- 2
-n_coarse_grid <- 20
+M <- 3
+n_coarse_grid <- 15
 
 grid <- make_grid(locs, M = M, n_coarse_grid = n_coarse_grid)
 
@@ -68,11 +68,12 @@ p1 + p2
 #     ggtitle("simulated layers")
 #
 # p_layers_sim
+message("Simulated loss:", 1/N * sum((y - z)^2))
 
 # Fit the model using sgd ----
 source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 source("~/sgMRA/R/adam.R")
-n_iter = 400
+n_iter = 100
 
 # add in Adam optimization schedule
 # profvis::profvis(
@@ -89,10 +90,10 @@ n_iter = 400
                    # alpha_x2=alpha_x2,
                    # alpha_y2=alpha_y2,
                    learn_rate = 0.1,
-
                    n_iter = n_iter,
-                   n_message = 10,
-                   penalized=FALSE)
+                   n_message = 5,
+                   penalized=TRUE,
+                   plot_during_fit = TRUE)
 
     # )
     # resume the GD with last model fit
@@ -104,8 +105,8 @@ n_iter = 400
                    alpha_y2=out$alpha_y2,
                    learn_rate = 0.1,
                    n_iter = n_iter,
-                   n_message = 10,
-                   penalized=TRUE)
+                   n_message = 5,
+                   penalized=TRUE, plot_during_fit = TRUE)
 # M=1, n_coarse_grid=10, layers = 3, fit-time:  elapsed, loss:
 # M=1, n_coarse_grid=10, layers = 2, fit-time: 364.731 elapsed, loss: 0.32
 # M=2, n_coarse_grid=30, layers = 2, fit-time: 1178.980 elapsed, loss: 0.0741
