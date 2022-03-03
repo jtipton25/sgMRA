@@ -1,3 +1,17 @@
+#' ADAM stochastic process update
+#'
+#' @param k The gradient descent iteration
+#' @param grad A list of gradient vectors
+#' @param m A list of momentums
+#' @param v A list of velocities
+#' @param beta1
+#' @param beta2
+#' @param epsilon
+#'
+#' @return
+#' @export
+#'
+#'
 adam <- function(k, grad, m, v, beta1=0.9, beta2=0.999, epsilon=1e-8) {
     # iteration k
     # learning rate (eta)

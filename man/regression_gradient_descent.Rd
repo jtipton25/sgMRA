@@ -10,7 +10,7 @@ regression_gradient_descent(
   W,
   inits = NULL,
   threshold = 0.01,
-  alpha = 0.001,
+  learn_rate = 0.001,
   num_iters = 10,
   print_every = 1,
   minibatch_size = NULL
@@ -28,14 +28,14 @@ be a numeric vector of length equal to the total columns of X and W.}
 
 \item{threshold}{The threshold for determining convergence.}
 
-\item{alpha}{The learning rate.}
-
 \item{num_iters}{The number of iterations to run the gradient descent algorithm.}
 
 \item{print_every}{The number of iterations between printing the output.}
 
 \item{minibatch_size}{If NULL, the full data are used. If set as a positive numeric value,
 this is the number of samples used in the minibatch.}
+
+\item{alpha}{The learning rate.}
 }
 \value{
 The output of the gradient descent algorithm

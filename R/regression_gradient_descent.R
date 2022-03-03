@@ -19,7 +19,7 @@
 #' @import Matrix
 #'
 regression_gradient_descent <- function(y, X, W,
-                                        inits = NULL, threshold = 0.01, alpha = 0.001,
+                                        inits = NULL, threshold = 0.01, learn_rate = 0.001,
                                         num_iters = 10, print_every = 1,
                                         minibatch_size = NULL){
 
@@ -43,13 +43,20 @@ regression_gradient_descent <- function(y, X, W,
     }
     beta_old <- inits
 
+    # initializing adam
+    m <- list(rep(0, length(beta_old)))
+    v <- list(rep(1, length(beta_old)))
 
     message("Starting gradient descent")
     loss[1] <- target_fun(y, U, beta_old)
+    message("Initial loss = ", loss[1])
+
     beta_save[1, ] <- beta_old
     # first iteration
     if (is.null(minibatch_size)) {
-        beta_new <- beta_old - alpha * gradient_fun(y, tUy, tUU, beta_old)
+        grad <- gradient_fun(y, tUy, tUU, beta_old)
+        adam_out <- adam(1, list(grad), m, v)
+        beta_new <- beta_old - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
     } else {
         idx <- sample(1:length(y), minibatch_size)
         y_idx <- y[idx]
@@ -57,7 +64,9 @@ regression_gradient_descent <- function(y, X, W,
         tUy_idx <- tU_idx %*% y_idx
         # tUU_idx <- tU_idx %*% t(tU_idx)
         # faster to subset tU to get tU_idx then transpose to U_idx than to subset U directly
-        beta_new <- beta_old - alpha * gradient_fun_mini(y_idx, tUy_idx, t(tU_idx), tU_idx, beta_old)
+        grad <- gradient_fun_mini(y_idx, tUy_idx, t(tU_idx), tU_idx, beta_old)
+        adam_out <- adam(1, list(grad), m, v)
+        beta_new <- beta_old - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
     }
 
     i <- 2
@@ -68,7 +77,9 @@ regression_gradient_descent <- function(y, X, W,
 
         beta_old <- beta_new
         if (is.null(minibatch_size)) {
-            beta_new <- beta_new - alpha * gradient_fun(y, tUy, tUU, beta_new)
+            grad <- gradient_fun(y, tUy, tUU, beta_new)
+            adam_out <- adam(i, list(grad), m, v)
+            beta_new <- beta_new - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
         } else {
             idx <- sample(1:length(y), minibatch_size)
             y_idx <- y[idx]
@@ -76,7 +87,9 @@ regression_gradient_descent <- function(y, X, W,
             tUy_idx <- tU_idx %*% y_idx
             # tUU_idx <- tU_idx %*% t(tU_idx)
             # faster to subset tU to get tU_idx then transpose to U_idx than to subset U directly
-            beta_new <- beta_old - alpha * gradient_fun_mini(y_idx, tUy_idx, t(tU_idx), tU_idx, beta_old)
+            grad <- gradient_fun_mini(y_idx, tUy_idx, t(tU_idx), tU_idx, beta_new)
+            adam_out <- adam(i, list(grad), m, v)
+            beta_new <- beta_new - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
         }
         loss[i] <- target_fun(y, U, beta_new)
         # save the estimates on the original data scale (not normalized scale)

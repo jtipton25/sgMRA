@@ -1,15 +1,18 @@
+#' Simulate deep MRA
+#'
+#' @param N The number of locations
+#' @param M The number of resolutions in the MRA approximation to the Gaussian process
+#' @param n_coarse_grid The number of grid locations in the coarsest resolution of the MRA approximation to the Gaussian process
+#' @param n_layers The number of layers in the deep process
+#' @param sigma The observation standard deviation
+#' @param use_spam A logical value of whether to use the spam library (use_spam=TRUE) or the Matrix library (use_spam=FALSE) for sparse matrix calculations
+#'
+#' @return
+#' @export
+#'
+#'
 sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
-                         n_layers = 3, sigma = 0.25) {
-
-    library(tidyverse)
-    library(spam)
-    library(Matrix)
-    library(igraph)
-    library(BayesMRA)
-    library(sgMRA)
-
-    source("~/sgMRA/R/eval_basis.R")
-    source("~/sgMRA/R/dwendland_basis.R")
+                         n_layers = 3, sigma = 0.25, use_spam = FALSE) {
 
     # define the locations and grid
     locs <- expand_grid(x=seq(0, 1, length.out=sqrt(N)),
@@ -23,7 +26,7 @@ sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
     alpha_y <- vector(mode = 'list', length = n_layers-1)
 
     # initialize the bottom layer
-    MRA[[n_layers]] <- eval_basis(locs, grid)
+    MRA[[n_layers]] <- eval_basis(locs, grid, use_spam)
     Q[[n_layers]] <- make_Q_alpha_2d(sqrt(MRA[[n_layers]]$n_dims),
                                      phi=rep(0.9, length(MRA[[n_layers]]$n_dims)))
     if (length(MRA[[n_layers]]$n_dims) > 1) {

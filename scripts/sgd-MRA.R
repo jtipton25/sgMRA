@@ -34,9 +34,9 @@ beta <- rnorm(ncol(X))
 
 ## MRA spatio-temporal random effect
 M <- 3
-n_coarse <- 30
+n_coarse <- 40
 
-MRA    <- mra_wendland_2d(locs, M = M, n_coarse = n_coarse, use_spam = TRUE)
+MRA <- mra_wendland_2d(locs, M = M, n_coarse = n_coarse, use_spam = TRUE)
 
 # MRA    <- mra_wendland_2d(locs, M = M, n_max_fine_grid = 2^8, use_spam = TRUE)
 W <- as.dgCMatrix.spam(MRA$W) # using the Matrix package is faster here because we don't need the Choleksy
@@ -44,10 +44,10 @@ W <- as.dgCMatrix.spam(MRA$W) # using the Matrix package is faster here because 
 n_dims <- MRA$n_dims
 dims_idx <- MRA$dims_idx
 
-Q_alpha      <- make_Q_alpha_2d(sqrt(n_dims), rep(0.999, length(n_dims)), prec_model = "CAR")
+Q_alpha      <- make_Q_alpha_2d(sqrt(n_dims), rep(0.999, length(n_dims)), prec_model = "CAR", use_spam = FALSE)
 
 tau2         <- 10 * 2^(2 * (1:M - 1))
-Q_alpha_tau2 <- make_Q_alpha_tau2(Q_alpha, tau2)
+Q_alpha_tau2 <- make_Q_alpha_tau2(Q_alpha, tau2, use_spam = FALSE)
 
 ## initialize the random effect
 ## set up a linear constraint so that each resolution sums to one
@@ -60,9 +60,12 @@ A_constraint <- sapply(1:M, function(i){
 a_constraint <- rep(0, M)
 alpha   <- as.vector(rmvnorm.prec.const(n = 1, mu = rep(0, sum(n_dims)), Q = Q_alpha_tau2, A = t(A_constraint), a = a_constraint))
 
-sigma2 <- runif(1, 0.25, 0.5)
+sigma2 <- 0.25
 
-y <- as.numeric(X %*% beta + W %*% alpha + rnorm(N, 0, sqrt(sigma2)))
+epsilon <- rnorm(N, 0, sqrt(sigma2))
+
+y <- as.numeric(W %*% alpha + sigma2)
+# y <- as.numeric(X %*% beta + W %*% alpha + sigma2)
 
 dat <- data.frame(x=locs[, 1], y = locs[, 2], z = y)
 
@@ -75,29 +78,34 @@ p_sim
 # gradient descent function for MRA using minibatch ----
 
 U <- cbind(X, W)
+message("loss = ", target_fun(y, U, c(rep(0, length(beta)), alpha)))
+message("loss = ", target_fun(y, U, c(beta, alpha)))
 
-
-profvis::profvis(
-# system.time(
+# profvis::profvis(
+system.time(
     dat_mini <- regression_gradient_descent(c(y),
-                                       X, W, inits = rnorm(ncol(U)),
+                                       X, W, inits = rnorm(ncol(U))*0.1,
                                        threshold = 0.000001,
-                                       alpha = 0.5, num_iters = 500,
-                                       print_every = 10,
-                                       minibatch_size = 2^6)
+                                       learn_rate = 1, num_iters = 2000,
+                                       print_every = 50,
+                                       minibatch_size = 2^8)
 )
 
-# Using full gradient
+# Using full gradient -- This algorithm gets more competitive with increasing sample size
 # profvis::profvis(
 system.time(
     dat_full <- regression_gradient_descent(c(y),
-                                       X, W, inits = rnorm(ncol(U)),
+                                       X, W, inits = rnorm(ncol(U))* 0.1,
                                        threshold = 0.000001,
-                                       alpha = 0.5, num_iters = 500,
-                                       print_every = 10,
+                                       learn_rate = 1, num_iters = 2000,
+                                       print_every = 50,
                                        minibatch_size = NULL)
 )
 
+
+
+plot(dat_mini$loss, type='l')
+lines(dat_full$loss, col='red', type='l')
 
 # predictions from the minibatch model
 beta_idx <- grepl("beta", names(dat_mini))
@@ -121,7 +129,7 @@ p_full <- ggplot(dat, aes(x, y, fill = y_pred_full)) +
     scale_fill_viridis_c() +
     ggtitle("Full fit")
 
-p_sim + p_mini + p_full
+p_sim / p_mini / p_full
 
 sd(y - y_pred_mini)
 sd(y - y_pred_full)
@@ -130,8 +138,9 @@ sd(y - y_pred_full)
 dat %>%
     pivot_longer(cols= y_pred_mini:y_pred_full) %>%
     ggplot(aes(x = y_sim, y=value)) +
-    geom_point() +
-    facet_wrap(~ name)
+    geom_hex() +
+    geom_abline(slope=1, intercept=0, color="red") +
+    facet_wrap(~ name, nrow=2)
 
 tU <- t(U)
 tUU <- t(U) %*% U

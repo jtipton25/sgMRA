@@ -1,3 +1,22 @@
+#' Make the deep MRA grid
+#'
+#' @param locs An N x 2 matrix of spatial locations
+#' @param min_x The minimum value of the MRA grid in the x axis
+#' @param min_y The minimum value of the MRA grid in the y axis
+#' @param max_x The maximum value of the MRA grid in the x axis
+#' @param max_y The maximum value of the MRA grid in the y axis
+#' @param M The number of resolutions.
+#' @param n_coarse_grid The number of basis functions in one direction (e.g. \code{n_coarse_grid = 10} results in a \eqn{10 \times 10}{10x10} course grid which is further extended by the number of additional padding basis functions given by \code{n_padding}.
+#' @param n_padding The number of additional boundary points to add on each boundary. For example, n_padding = 5 will add 5 boundary knots to the both the left  and right side of the grid).
+#' @param n_neighbors The expected number of neighbors for each interior basis function. This determines the basis radius parameter.
+#' @param max_points The maximum number of points in the
+#' @param basis_type The basis type. Currently only the "wendland" basis is supported
+#' @param use_spam Whether to use spam or Matrix for sparse matrix
+#'
+#' @return A grid object with \code{locs_grid} for the MRA grid and \code{radius} for the thresholded distance radius
+#' @export
+#'
+#'
 make_grid <- function(locs,
     min_x = -6, min_y = -6, max_x = 6, max_y = 6,
     M             = 4,
@@ -5,44 +24,29 @@ make_grid <- function(locs,
     n_padding     = 5L,
     n_neighbors   = 68,
     max_points    = NULL,
-    # n_max_fine_grid = 2^12,
-    # radius      = 25,
     basis_type    = "wendland",
-    use_spam      = TRUE
+    use_spam      = FALSE
 ) {
 
 
     N <- nrow(locs)
 
-    ## Define max_points parameter
-    if (is.null(max_points)) {
-        max_points <- 2* N * n_neighbors
-    }
-    ## Assign as many gridpoints (approximately) as data
-    # n_grid <- ceiling(sqrt(N / 2^(M:1 - 1)))
-
     ## finest grid is the smaller of n_max_fine_grid
     ## or the largest power of 2 larger than N
-    # n_grid <- ceiling(min(n_max_fine_grid, 2^ceiling(log(N, base = 2)))^(0.5) / 2^(M:1 - 1))
     n_grid <- n_coarse_grid * 2^(1:M - 1)
     if (min(n_grid) < 4) {
         stop("There are too many resolutions to form a reliable grid. Reduce M and try again.")
     }
 
-    ## define radius so that each basis function covers approximately 5 neighbors
+    ## define radius so that each basis function covers approximately n_neighbors
     area_domain      <- (max_x - min_x) * (max_y - min_y)
     density_domain   <- max(n_grid^2) / area_domain
     radius_fine_grid <- sqrt(n_neighbors / (density_domain * base::pi))
-    # radius           <- radius_fine_grid * (2^(1:M - 1))^2
     radius           <- radius_fine_grid * (2^(M:1 - 1))
-    # radius <- radius / 2^(1:M - 1)
 
     ## generate a set of grid locations for the basis
     locs_grid    <- vector(mode = "list", length = M)
-    out          <- vector(mode = "list", length = M)
     W            <- vector(mode = "list", length = M)
-
-    # guess the max_points variable
 
     for (m in 1:M) {
 
@@ -80,14 +84,24 @@ make_grid <- function(locs,
 
 
 
+#' Evaluate the MRA basis
+#'
+#' @param locs An N x 2 matrix of spatial locations
+#' @param grid
+#' @param n_padding
+#' @param n_neighbors
+#' @param basis_type
+#' @param use_spam
+#'
+#' @return
+#' @export
+#'
+#' @examples
 eval_basis <- function(
     locs,
     grid,
     n_padding     = 5L,
     n_neighbors   = 68,
-    max_points    = NULL,
-    # n_max_fine_grid = 2^12,
-    # radius      = 25,
     basis_type    = "wendland",
     use_spam      = TRUE
 ) {
@@ -115,9 +129,6 @@ eval_basis <- function(
     # if (!is_positive_integer(n_padding, 1)) {
     #     stop("n_padding must be a positive integer")
     # }
-    # if (!(is.null(max_points) | is_positive_integer(max_points, 1))) {
-    #     stop("max_points must be either NULL or a positive numeric integer")
-    # }
     # if (!is.logical(use_spam) || length(use_spam) != 1 || is.na(use_spam)) {
     #     stop("use_spam must be either TRUE or FALSE")
     # }
@@ -130,10 +141,6 @@ eval_basis <- function(
 
     N <- nrow(locs)
 
-    ## Define max_points parameter
-    if (is.null(max_points)) {
-        max_points <- 2* N * n_neighbors
-    }
     ## Assign as many gridpoints (approximately) as data
     # n_grid <- ceiling(sqrt(N / 2^(M:1 - 1)))
 
@@ -147,13 +154,11 @@ eval_basis <- function(
     ddistx       <- vector(mode = "list", length = M)
     ddisty       <- vector(mode = "list", length = M)
 
-    # guess the max_points variable
 
     for (m in 1:M) {
 
-
         # rewriten to include dW and ddist functions for more efficiency,
-        # TODO: rewrite to include basis and dbasis
+        # TODO: rewrite to include basis and dbasis -- not worth it as this doesn't add much speed
 
 
         D <- distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),

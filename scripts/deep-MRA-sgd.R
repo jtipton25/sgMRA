@@ -15,23 +15,22 @@ library(tidyverse)
 library(BayesMRA)
 library(patchwork)
 
-source("~/sgMRA/R/eval_basis.R")
-Rcpp::sourceCpp("~/sgMRA/src/dist_near_cpp.cpp")
-source("~/sgMRA/R/dwendland_basis.R")
+library(sgMRA)
 
-set.seed(404)
+set.seed(42)
 
-N <- 2^12
+N <- 2^10
 
-M <- 3
-n_coarse_grid <- 30
+M <- 2
+n_coarse_grid <- 10
 # N <- 2^12
 # M <- 1
 # n_coarse_grid <- 80
-source("~/sgMRA/R/sim-deep-mra.R")
+# source("~/sgMRA/R/sim-deep-mra.R")
 dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.1)
 
 y=dat_sim$y
+grid=dat_sim$grid
 MRA=dat_sim$MRA[[1]]
 MRA1=dat_sim$MRA[[2]]
 MRA2=dat_sim$MRA[[3]]
@@ -94,9 +93,7 @@ p_layers_sim
 1 / N * sum((dat_sim$y - dat_sim$MRA[[1]]$W %*% dat_sim$alpha)^2)
 
 # Fit the model using sgd ----
-source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
-source("~/sgMRA/R/adam.R")
-n_iter = 200
+n_iter = 2000
 
 # add in Adam optimization schedule
 out <- fit_sgd(y=dat_sim$y,
@@ -107,15 +104,12 @@ out <- fit_sgd(y=dat_sim$y,
                alpha_y1=NULL,
                alpha_x2=NULL,
                alpha_y2=NULL,
-               # alpha=alpha,
-               # alpha_x1=alpha_x1,
-               # alpha_y1=alpha_y1,
-               # alpha_x2=alpha_x2,
-               # alpha_y2=alpha_y2,
                learn_rate = 0.1,
                n_iter = n_iter,
-               n_message = 1,
-               penalized = FALSE)
+               n_message = 50,
+               penalized = TRUE,
+               plot_during_fit = TRUE,
+               use_spam=FALSE)
 
 # re-fit the model with the current state to continue the learning
 
@@ -127,19 +121,22 @@ out <- fit_sgd(y=dat_sim$y,
                alpha_y1=out$alpha_y1,
                alpha_x2=out$alpha_x2,
                alpha_y2=out$alpha_y2,
-               learn_rate = 0.1,
+               learn_rate = 0.01,
                n_iter = n_iter,
-               n_message = 1,
-               penalized=TRUE)
+               n_message = 50,
+               penalized = TRUE,
+               plot_during_fit = TRUE,
+               use_spam=FALSE,
+               adam_pars = out$adam_pars)
 plot(out$loss, type = 'l')
 
 # examine the fitted layers
 dat <- data.frame(x = locs$x, y = locs$y,
                   layer = rep(c(1, 1, 2, 2, 3), each=N),
                   group = rep(c("x", "y", "x", "y", "z"), each = N),
-                  z = c(out$MRA2$W %*% out$alpha_x2, out$MRA2$W %*% out$alpha_y2,
-                        out$MRA1$W %*% out$alpha_x1, out$MRA1$W %*% out$alpha_y1,
-                        out$MRA$W %*% out$alpha))
+                  z = c(drop(out$MRA2$W %*% out$alpha_x2), drop(out$MRA2$W %*% out$alpha_y2),
+                        drop(out$MRA1$W %*% out$alpha_x1), drop(out$MRA1$W %*% out$alpha_y1),
+                        drop(out$MRA$W %*% out$alpha)))
 p_layers_fit <- ggplot(dat, aes(x, y, fill=z)) +
     geom_raster() +
     scale_fill_viridis_c() +
@@ -151,7 +148,7 @@ p_layers_sim / p_layers_fit
 
 dat <- data.frame(x = locs$x, y = locs$y,
                   z = z,
-                  z_fit = out$MRA$W %*% out$alpha)
+                  z_fit = drop(out$MRA$W %*% out$alpha))
 
 p_fit <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +
     geom_raster() +
