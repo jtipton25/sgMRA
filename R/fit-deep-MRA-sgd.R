@@ -23,9 +23,9 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 
     N <- length(y)
     # first layer w.r.t alpha
-    delta <- drop(- 1/N * (y - MRA$W %*% alpha))
+    delta <- drop(- 1 / N * (y - MRA$W %*% alpha))
     # first layer w.r.t W
-    delta_W <- (2 / N * (MRA$W %*% alpha - y)) %*% t(alpha)
+    delta_W <- (1 / N * (MRA$W %*% alpha - y)) %*% t(alpha)
 
     # second layer
     delta_x1 <- rowSums(delta_W * (MRA$dW * MRA$ddistx))
@@ -221,7 +221,7 @@ fit_sgd <- function(y, locs, grid,
     # initialize the loss
     loss <- rep(NA, n_iter)
 
-    message("Initializing the model, the initialization loss is = ", 1 / N * sum((y - MRA$W %*% alpha)^2))
+    message("Initializing the model, the initialization loss is = ", 1 / (2 * N) * sum((y - MRA$W %*% alpha)^2))
 
     # plot the data
     if (plot_during_fit) {
@@ -288,7 +288,7 @@ fit_sgd <- function(y, locs, grid,
         m <- pars$m
         v <- pars$v
 
-        loss[i] <- 1 / N * sum((y - MRA$W %*% alpha)^2)
+        loss[i] <- 1 / (2 * N) * sum((y - MRA$W %*% alpha)^2)
         if (i %% n_message == 0) {
             message("iteration i = ", i, " loss = ", loss[i])
             if (plot_during_fit) {

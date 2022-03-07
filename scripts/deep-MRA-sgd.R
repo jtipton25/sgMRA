@@ -21,8 +21,8 @@ set.seed(42)
 
 N <- 2^10
 
-M <- 2
-n_coarse_grid <- 10
+M <- 1
+n_coarse_grid <- 30
 # N <- 2^12
 # M <- 1
 # n_coarse_grid <- 80
@@ -90,7 +90,7 @@ p_layers_sim <- ggplot(dat, aes(x, y, fill=z)) +
 p_layers_sim
 
 # log-likelihood
-1 / N * sum((dat_sim$y - dat_sim$MRA[[1]]$W %*% dat_sim$alpha)^2)
+1 / (2*N) * sum((dat_sim$y - dat_sim$MRA[[1]]$W %*% dat_sim$alpha)^2)
 
 # Fit the model using sgd ----
 n_iter = 2000

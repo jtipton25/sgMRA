@@ -9,6 +9,7 @@ library(igraph)
 library(tidyverse)
 library(BayesMRA)
 library(patchwork)
+library(sgMRA)
 
 source("~/sgMRA/R/eval_basis.R")
 Rcpp::sourceCpp("~/sgMRA/src/dist_near_cpp.cpp")
@@ -26,15 +27,18 @@ z <- cos(2*pi*locs$x) * cos(2*pi*locs$y)
 z[idx1] <- z[idx1] + sin(4*pi*locs$x[idx1]) * sin(4*pi*locs$y[idx1])
 z[idx2] <- z[idx2] + sin(8*pi*locs$x[idx2]) * sin(8*pi*locs$y[idx2])
 z[idx3] <- z[idx3] + sin(16*pi*locs$x[idx3]) * sin(16*pi*locs$y[idx3])
-
+z <- 2*z
 
 
 M <- 3
-n_coarse_grid <- 15
+n_coarse_grid <- 45
 
 grid <- make_grid(locs, M = M, n_coarse_grid = n_coarse_grid)
+MRA <- eval_basis(locs, grid, use_spam = FALSE)
+dim(MRA$W)
 
-sigma <- 0.02
+
+sigma <- 0.05
 epsilon <- rnorm(N, 0, sigma)
 y_obs <- z + epsilon
 y <- y_obs
@@ -68,12 +72,12 @@ p1 + p2
 #     ggtitle("simulated layers")
 #
 # p_layers_sim
-message("Simulated loss:", 1/N * sum((y - z)^2))
+message("Simulated loss:", 1 / (2 * N) * sum((y - z)^2))
 
 # Fit the model using sgd ----
-source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
-source("~/sgMRA/R/adam.R")
-n_iter = 100
+# source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
+# source("~/sgMRA/R/adam.R")
+n_iter = 500
 
 # add in Adam optimization schedule
 # profvis::profvis(
@@ -91,7 +95,7 @@ n_iter = 100
                    # alpha_y2=alpha_y2,
                    learn_rate = 0.1,
                    n_iter = n_iter,
-                   n_message = 5,
+                   n_message = 50,
                    penalized=TRUE,
                    plot_during_fit = TRUE)
 
@@ -105,8 +109,9 @@ n_iter = 100
                    alpha_y2=out$alpha_y2,
                    learn_rate = 0.1,
                    n_iter = n_iter,
-                   n_message = 5,
-                   penalized=TRUE, plot_during_fit = TRUE)
+                   n_message = 50,
+                   penalized=TRUE,
+                   plot_during_fit = TRUE)
 # M=1, n_coarse_grid=10, layers = 3, fit-time:  elapsed, loss:
 # M=1, n_coarse_grid=10, layers = 2, fit-time: 364.731 elapsed, loss: 0.32
 # M=2, n_coarse_grid=30, layers = 2, fit-time: 1178.980 elapsed, loss: 0.0741
@@ -121,9 +126,9 @@ dat <- data.frame(x = locs$x, y = locs$y,
                   # group = rep(c("x", "y", "z"), each = N),
                   layer = rep(c(1, 1, 2, 2, 3), each=N),
                   group = rep(c("x", "y", "x", "y", "z"), each = N),
-                  z = c(out$MRA2$W %*% out$alpha_x2, out$MRA2$W %*% out$alpha_y2,
-                        out$MRA1$W %*% out$alpha_x1, out$MRA1$W %*% out$alpha_y1,
-                        out$MRA$W %*% out$alpha))
+                  z = c(drop(out$MRA2$W %*% out$alpha_x2), drop(out$MRA2$W %*% out$alpha_y2),
+                        drop(out$MRA1$W %*% out$alpha_x1), drop(out$MRA1$W %*% out$alpha_y1),
+                        drop(out$MRA$W %*% out$alpha)))
 # plot_func <- function(df, name) {
 #     ggplot(data = df, aes(x = x, y = y, fill = z)) +
 #         geom_raster() +
