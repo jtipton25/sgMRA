@@ -11,9 +11,9 @@ library(BayesMRA)
 library(patchwork)
 library(sgMRA)
 
-source("~/sgMRA/R/eval_basis.R")
-Rcpp::sourceCpp("~/sgMRA/src/dist_near_cpp.cpp")
-source("~/sgMRA/R/dwendland_basis.R")
+# source("~/sgMRA/R/eval_basis.R")
+# Rcpp::sourceCpp("~/sgMRA/src/dist_near_cpp.cpp")
+# source("~/sgMRA/R/dwendland_basis.R")
 
 set.seed(44)
 N <- 2^12
@@ -30,8 +30,8 @@ z[idx3] <- z[idx3] + sin(16*pi*locs$x[idx3]) * sin(16*pi*locs$y[idx3])
 z <- 2*z
 
 
-M <- 3
-n_coarse_grid <- 45
+M <- 1
+n_coarse_grid <- 200
 
 grid <- make_grid(locs, M = M, n_coarse_grid = n_coarse_grid)
 MRA <- eval_basis(locs, grid, use_spam = FALSE)
@@ -77,11 +77,11 @@ message("Simulated loss:", 1 / (2 * N) * sum((y - z)^2))
 # Fit the model using sgd ----
 # source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 # source("~/sgMRA/R/adam.R")
-n_iter = 500
+n_iter = 2000
 
 # add in Adam optimization schedule
-# profvis::profvis(
-# system.time(
+# profvis::profvis({
+# system.time({
     out <- fit_sgd(y = y, locs = locs, grid = grid,
                    alpha=NULL,
                    alpha_x1=NULL,
@@ -96,12 +96,14 @@ n_iter = 500
                    learn_rate = 0.1,
                    n_iter = n_iter,
                    n_message = 50,
-                   penalized=TRUE,
+                   penalized=FALSE,
                    plot_during_fit = TRUE)
 
-    # )
+# })
     # resume the GD with last model fit
-    out <- fit_sgd(y = y, locs = locs, grid = grid,
+    out <- fit_sgd(y = y,
+                   locs = locs,
+                   grid = grid,
                    alpha=out$alpha,
                    alpha_x1=out$alpha_x1,
                    alpha_y1=out$alpha_y1,

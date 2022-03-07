@@ -1,13 +1,3 @@
-# calc_ddiff <- function(locs, grid, MRA) {
-#     # only calculate the differenxe for the non-zero rows
-#     diffs <- 2*(locs[MRA$D$ind[, 1], ] - grid$locs_grid[[1]][MRA$D$ind[, 2], ])
-#     MRA$D$diffsx <- diffs$x
-#     ddistx <- spam(MRA$D[c("ind", "diffsx")], nrow = MRA$D$da[1], ncol = MRA$D$da[2])
-#     MRA$D$diffsy <- diffs$y
-#     ddisty <- spam(MRA$D[c("ind", "diffsy")], nrow = MRA$D$da[1], ncol = MRA$D$da[2])
-#     return(list(ddistx=ddistx, ddisty=ddisty))
-# }
-
 update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             alpha,
                             alpha_x1, alpha_y1,
@@ -23,7 +13,7 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 
     N <- length(y)
     # first layer w.r.t alpha
-    delta <- drop(- 1 / N * (y - MRA$W %*% alpha))
+    delta <- drop(1 / N * (MRA$W %*% alpha - y))
     # first layer w.r.t W
     delta_W <- (1 / N * (MRA$W %*% alpha - y)) %*% t(alpha)
 
@@ -74,26 +64,29 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 
 #' Title
 #'
-#' @param y
-#' @param locs
-#' @param grid
-#' @param alpha
-#' @param alpha_x1
-#' @param alpha_y1
-#' @param alpha_x2
-#' @param alpha_y2
-#' @param learn_rate
-#' @param n_iter
-#' @param n_message
-#' @param penalized
-#' @param plot_during_fit
-#' @param use_spam
+#' @param y The data
+#' @param locs An N x 2 matrix of spatial locations
+#' @param grid A grid object that is the output of \code{make_grid}
+#' @param alpha If specified, the top layer MRA parameters
+#' @param alpha_x1 If specified, the first hidden layer MRA parameters for the x-axis variable
+#' @param alpha_y1 If specified, the first hidden layer MRA parameters for the y-axis variable
+#' @param alpha_x2 If specified, the second hidden layer MRA parameters for the x-axis variable
+#' @param alpha_y2 If specified, the second hidden layer MRA parameters for the y-axis variable
+#' @param learn_rate The gradient descent learning rate
+#' @param n_iter The number of gradient descent iterations
+#' @param n_message The number of iterations between which to output a message
+#' @param penalized Fit using a penalty term
+#' @param plot_during_fit Plot the current parameter states every \code{n_message} iterations
+#' @param use_spam Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices
+#' @param adam_pars The adam parameter state to allow restarting the model
 #'
 #' @return
 #' @export
 #'
 #'
-fit_sgd <- function(y, locs, grid,
+fit_sgd <- function(y,
+                    locs,
+                    grid,
                     alpha = NULL,
                     alpha_x1 = NULL,
                     alpha_y1 = NULL,
@@ -112,23 +105,27 @@ fit_sgd <- function(y, locs, grid,
 
     # initialize the MRA parameters here
     MRA2 <- eval_basis(locs, grid, use_spam=use_spam)
-    Q2 <- make_Q_alpha_2d(sqrt(MRA2$n_dims), phi=rep(0.9, length(MRA2$n_dims)), use_spam=use_spam)
-    if (length(MRA2$n_dims) > 1) {
-        for (m in 1:M){
-            Q2[[m]] <- 2^(2*(m-1)) * Q2[[m]]
-        }
-        if (use_spam) {
-            Q2 <- do.call(bdiag.spam, Q2)
-        } else {
-            Q2 <- do.call(bdiag, Q2)
-        }
-    }
-    if (use_spam) {
-        class(Q2) <- "spam"
-    } else {
-        class(Q2) <- "dgCMatrix"
+    Q2 <- make_Q(sqrt(MRA2$n_dims), phi=rep(0.9, length(MRA2$n_dims)), use_spam=use_spam)
+    if (!use_spam) {
         CH2 <- Cholesky(Q2)
     }
+    # Q2 <- make_Q_alpha_2d(sqrt(MRA2$n_dims), phi=rep(0.9, length(MRA2$n_dims)), use_spam=use_spam)
+    # if (length(MRA2$n_dims) > 1) {
+    #     for (m in 1:M){
+    #         Q2[[m]] <- 2^(2*(m-1)) * Q2[[m]]
+    #     }
+    #     if (use_spam) {
+    #         Q2 <- do.call(bdiag.spam, Q2)
+    #     } else {
+    #         Q2 <- do.call(bdiag, Q2)
+    #     }
+    # }
+    # if (use_spam) {
+    #     class(Q2) <- "spam"
+    # } else {
+    #     class(Q2) <- "dgCMatrix"
+    #     CH2 <- Cholesky(Q2)
+    # }
 
     if (is.null(alpha_x2)) {
         # alpha_x2 <- rnorm(ncol(MRA2$W), 0, 0.1)
@@ -150,24 +147,28 @@ fit_sgd <- function(y, locs, grid,
     }
 
     MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid, use_spam=use_spam)
-    Q1 <- make_Q_alpha_2d(sqrt(MRA1$n_dims), phi=rep(0.9, length(MRA1$n_dims)), use_spam=use_spam)
-    if (length(MRA1$n_dims) > 1) {
-        for (m in 1:M){
-            Q1[[m]] <- 2^(2*(m-1)) * Q1[[m]]
-        }
-        if (use_spam) {
-            Q1 <- do.call(bdiag.spam, Q1)
-        } else {
-            Q1 <- do.call(bdiag, Q1)
-        }
-
-    }
-    if (use_spam) {
-        class(Q1) <- "spam"
-    } else {
-        class(Q1) <- "dgCMatrix"
+    Q1 <- make_Q(sqrt(MRA1$n_dims), phi=rep(0.9, length(MRA1$n_dims)), use_spam=use_spam)
+    if (!use_spam) {
         CH1 <- Cholesky(Q1)
     }
+    # Q1 <- make_Q_alpha_2d(sqrt(MRA1$n_dims), phi=rep(0.9, length(MRA1$n_dims)), use_spam=use_spam)
+    # if (length(MRA1$n_dims) > 1) {
+    #     for (m in 1:M){
+    #         Q1[[m]] <- 2^(2*(m-1)) * Q1[[m]]
+    #     }
+    #     if (use_spam) {
+    #         Q1 <- do.call(bdiag.spam, Q1)
+    #     } else {
+    #         Q1 <- do.call(bdiag, Q1)
+    #     }
+    #
+    # }
+    # if (use_spam) {
+    #     class(Q1) <- "spam"
+    # } else {
+    #     class(Q1) <- "dgCMatrix"
+    #     CH1 <- Cholesky(Q1)
+    # }
 
     if (is.null(alpha_x1)) {
         # alpha_x1 <- rnorm(ncol(MRA1$W), 0, 0.1)
@@ -189,24 +190,28 @@ fit_sgd <- function(y, locs, grid,
     }
 
     MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid, use_spam=use_spam)
-    Q <- make_Q_alpha_2d(sqrt(MRA$n_dims), phi=rep(0.9, length(MRA1$n_dims)), use_spam=use_spam)
-    if (length(MRA$n_dims) > 1) {
-        for (m in 1:M){
-            Q[[m]] <- 2^(2*(m-1)) * Q[[m]]
-        }
-        if (use_spam) {
-            Q <- do.call(bdiag.spam, Q)
-        } else {
-            Q <- do.call(bdiag, Q)
-        }
-    }
-
-    if (use_spam) {
-        class(Q) <- "spam"
-    } else {
-        class(Q) <- "dgCMatrix"
+    Q <- make_Q(sqrt(MRA$n_dims), phi=rep(0.9, length(MRA$n_dims)), use_spam=use_spam)
+    if (!use_spam) {
         CH <- Cholesky(Q)
     }
+    # Q <- make_Q_alpha_2d(sqrt(MRA$n_dims), phi=rep(0.9, length(MRA1$n_dims)), use_spam=use_spam)
+    # if (length(MRA$n_dims) > 1) {
+    #     for (m in 1:M){
+    #         Q[[m]] <- 2^(2*(m-1)) * Q[[m]]
+    #     }
+    #     if (use_spam) {
+    #         Q <- do.call(bdiag.spam, Q)
+    #     } else {
+    #         Q <- do.call(bdiag, Q)
+    #     }
+    # }
+    #
+    # if (use_spam) {
+    #     class(Q) <- "spam"
+    # } else {
+    #     class(Q) <- "dgCMatrix"
+    #     CH <- Cholesky(Q)
+    # }
 
     if (is.null(alpha)) {
         # alpha <- rnorm(ncol(MRA$W), 0, 0.1)

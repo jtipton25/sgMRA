@@ -15,7 +15,11 @@ adam(k, grad, m, v, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-08)
 
 \item{v}{A list of velocities}
 
-\item{epsilon}{}
+\item{beta1}{The decay rate for the momentum}
+
+\item{beta2}{The decay rate for the velocity}
+
+\item{epsilon}{A small amount to prevent a divide-by-zero error}
 }
 \value{
 

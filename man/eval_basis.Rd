@@ -7,7 +7,6 @@
 eval_basis(
   locs,
   grid,
-  n_padding = 5L,
   n_neighbors = 68,
   basis_type = "wendland",
   use_spam = TRUE
@@ -16,7 +15,13 @@ eval_basis(
 \arguments{
 \item{locs}{An N x 2 matrix of spatial locations}
 
-\item{use_spam}{}
+\item{grid}{A grid object that is the output of \code{make_grid}}
+
+\item{n_neighbors}{The expected number of neighbors based on the grid}
+
+\item{basis_type}{The basis function type. Currently only "wendland" is accepted}
+
+\item{use_spam}{Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices}
 }
 \value{
 

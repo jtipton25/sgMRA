@@ -19,10 +19,10 @@ library(sgMRA)
 
 set.seed(42)
 
-N <- 2^10
+N <- 2^12
 
-M <- 1
-n_coarse_grid <- 30
+M <- 3
+n_coarse_grid <- 10
 # N <- 2^12
 # M <- 1
 # n_coarse_grid <- 80

@@ -23,7 +23,35 @@ fit_sgd(
 )
 }
 \arguments{
-\item{use_spam}{}
+\item{y}{The data}
+
+\item{locs}{An N x 2 matrix of spatial locations}
+
+\item{grid}{A grid object that is the output of \code{make_grid}}
+
+\item{alpha}{If specified, the top layer MRA parameters}
+
+\item{alpha_x1}{If specified, the first hidden layer MRA parameters for the x-axis variable}
+
+\item{alpha_y1}{If specified, the first hidden layer MRA parameters for the y-axis variable}
+
+\item{alpha_x2}{If specified, the second hidden layer MRA parameters for the x-axis variable}
+
+\item{alpha_y2}{If specified, the second hidden layer MRA parameters for the y-axis variable}
+
+\item{learn_rate}{The gradient descent learning rate}
+
+\item{n_iter}{The number of gradient descent iterations}
+
+\item{n_message}{The number of iterations between which to output a message}
+
+\item{penalized}{Fit using a penalty term}
+
+\item{plot_during_fit}{Plot the current parameter states every \code{n_message} iterations}
+
+\item{use_spam}{Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices}
+
+\item{adam_pars}{The adam parameter state to allow restarting the model}
 }
 \value{
 

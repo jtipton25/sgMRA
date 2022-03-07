@@ -8,7 +8,7 @@
 #     return(list(ddistx=ddistx, ddisty=ddisty))
 # }
 
-update_deep_mra <- function(y, locs, grid, n_layers,
+update_deep_mra_layers <- function(y, locs, grid, n_layers,
                             MRA,
                             alpha,
                             alpha_x, alpha_y,
@@ -77,7 +77,7 @@ update_deep_mra <- function(y, locs, grid, n_layers,
 }
 
 
-fit_sgd <- function(y, locs, grid,
+fit_sgd_layers <- function(y, locs, grid,
                     n_layers = 3,
                     # alpha = NULL,
                     # alpha_x1 = NULL,

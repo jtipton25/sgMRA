@@ -4,9 +4,9 @@
 #' @param grad A list of gradient vectors
 #' @param m A list of momentums
 #' @param v A list of velocities
-#' @param beta1
-#' @param beta2
-#' @param epsilon
+#' @param beta1 The decay rate for the momentum
+#' @param beta2 The decay rate for the velocity
+#' @param epsilon A small amount to prevent a divide-by-zero error
 #'
 #' @return
 #' @export

@@ -18,7 +18,10 @@
 #'
 #'
 make_grid <- function(locs,
-    min_x = -6, min_y = -6, max_x = 6, max_y = 6,
+    min_x = -6,
+    min_y = -6,
+    max_x = 6,
+    max_y = 6,
     M             = 4,
     n_coarse_grid = 10,
     n_padding     = 5L,
@@ -87,20 +90,18 @@ make_grid <- function(locs,
 #' Evaluate the MRA basis
 #'
 #' @param locs An N x 2 matrix of spatial locations
-#' @param grid
-#' @param n_padding
-#' @param n_neighbors
-#' @param basis_type
-#' @param use_spam
+#' @param grid A grid object that is the output of \code{make_grid}
+#' @param n_neighbors The expected number of neighbors based on the grid
+#' @param basis_type The basis function type. Currently only "wendland" is accepted
+#' @param use_spam Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices
 #'
 #' @return
 #' @export
 #'
-#' @examples
+#'
 eval_basis <- function(
     locs,
     grid,
-    n_padding     = 5L,
     n_neighbors   = 68,
     basis_type    = "wendland",
     use_spam      = TRUE
@@ -125,9 +126,6 @@ eval_basis <- function(
     # }
     # if (!is_positive_integer(n_coarse_grid, 1)) {
     #     stop("n_coarse_grid must be a positive integer")
-    # }
-    # if (!is_positive_integer(n_padding, 1)) {
-    #     stop("n_padding must be a positive integer")
     # }
     # if (!is.logical(use_spam) || length(use_spam) != 1 || is.na(use_spam)) {
     #     stop("use_spam must be either TRUE or FALSE")
@@ -217,7 +215,6 @@ eval_basis <- function(
         dims_idx      = dims_idx,
         n_neighbors   = n_neighbors,
         n_coarse_grid = n_coarse_grid,
-        n_padding     = n_padding,
         use_spam      = use_spam
     )
 
