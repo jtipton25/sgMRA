@@ -15,8 +15,7 @@ make_grid(
   n_padding = 5L,
   n_neighbors = 68,
   max_points = NULL,
-  basis_type = "wendland",
-  use_spam = FALSE
+  basis_type = "wendland"
 )
 }
 \arguments{

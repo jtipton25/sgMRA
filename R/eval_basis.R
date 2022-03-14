@@ -27,8 +27,7 @@ make_grid <- function(locs,
     n_padding     = 5L,
     n_neighbors   = 68,
     max_points    = NULL,
-    basis_type    = "wendland",
-    use_spam      = FALSE
+    basis_type    = "wendland"
 ) {
 
 
@@ -91,18 +90,17 @@ make_grid <- function(locs,
 #'
 #' @param locs An N x 2 matrix of spatial locations
 #' @param grid A grid object that is the output of \code{make_grid}
-#' @param n_neighbors The expected number of neighbors based on the grid
 #' @param basis_type The basis function type. Currently only "wendland" is accepted
 #' @param use_spam Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices
 #'
 #' @return
 #' @export
 #'
+#' @importFrom BayesMRA make_basis
 #'
 eval_basis <- function(
     locs,
     grid,
-    n_neighbors   = 68,
     basis_type    = "wendland",
     use_spam      = TRUE
 ) {
@@ -120,9 +118,6 @@ eval_basis <- function(
     # }
     # if (!is_positive_integer(M, 1)) {
     #     stop("the number of resolutions M must be a positive integer")
-    # }
-    # if (!is_positive_integer(n_neighbors, 1)) {
-    #     stop("n_neighbors must be a positive integer")
     # }
     # if (!is_positive_integer(n_coarse_grid, 1)) {
     #     stop("n_coarse_grid must be a positive integer")
@@ -147,6 +142,7 @@ eval_basis <- function(
     # n_grid <- ceiling(min(n_max_fine_grid, 2^ceiling(log(N, base = 2)))^(0.5) / 2^(M:1 - 1))
 
     M <- length(grid$locs_grid)
+    D            <- vector(mode = "list", length = M)
     W            <- vector(mode = "list", length = M)
     dW           <- vector(mode = "list", length = M)
     ddistx       <- vector(mode = "list", length = M)
@@ -159,28 +155,27 @@ eval_basis <- function(
         # TODO: rewrite to include basis and dbasis -- not worth it as this doesn't add much speed
 
 
-        D <- distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
-                                          radius = grid$radius[m],
-                                          n_neighbors = n_neighbors)
-        D$basis <- make_basis(D$V, grid$radius[m], basis_type='wendland')
-        D$dbasis <- dwendland_basis(D$V, grid$radius[m])
+        D[[m]] <- distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
+                                          radius = grid$radius[m])
+        D[[m]]$basis <- make_basis(D[[m]]$V, grid$radius[m], basis_type='wendland')
+        D[[m]]$dbasis <- dwendland_basis(D[[m]]$V, grid$radius[m])
 
         N_grid <- nrow(grid$locs_grid[[m]])
 
         if (use_spam) {
             ## use the spam sparse matrix package
-            W[[m]] <- spam(D[c('ind', 'basis')], nrow =N, ncol = N_grid)
-            dW[[m]] <- spam(D[c("ind", "dbasis")], nrow = N, ncol = N_grid)
-            ddistx[[m]] <- spam(D[c("ind", "ddistx")], nrow = N, ncol = N_grid)
-            ddisty[[m]] <- spam(D[c("ind", "ddisty")], nrow = N, ncol = N_grid)
+            W[[m]] <- spam(D[[m]][c('ind', 'basis')], nrow =N, ncol = N_grid)
+            dW[[m]] <- spam(D[[m]][c("ind", "dbasis")], nrow = N, ncol = N_grid)
+            ddistx[[m]] <- spam(D[[m]][c("ind", "ddistx")], nrow = N, ncol = N_grid)
+            ddisty[[m]] <- spam(D[[m]][c("ind", "ddisty")], nrow = N, ncol = N_grid)
 
             # }
         } else {
             # stop("The Matrix package is not currently supported")
-            W[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$basis), dims = c(N, N_grid))
-            dW[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$dbasis), dims = c(N, N_grid))
-            ddistx[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$ddistx), dims = c(N, N_grid))
-            ddisty[[m]] <- sparseMatrix(i = D$ind[, 1], j=D$ind[, 2], x = as.numeric(D$ddisty), dims = c(N, N_grid))
+            W[[m]] <- sparseMatrix(i = D[[m]]$ind[, 1], j=D[[m]]$ind[, 2], x = as.numeric(D[[m]]$basis), dims = c(N, N_grid))
+            dW[[m]] <- sparseMatrix(i = D[[m]]$ind[, 1], j=D[[m]]$ind[, 2], x = as.numeric(D[[m]]$dbasis), dims = c(N, N_grid))
+            ddistx[[m]] <- sparseMatrix(i = D[[m]]$ind[, 1], j=D[[m]]$ind[, 2], x = as.numeric(D[[m]]$ddistx), dims = c(N, N_grid))
+            ddisty[[m]] <- sparseMatrix(i = D[[m]]$ind[, 1], j=D[[m]]$ind[, 2], x = as.numeric(D[[m]]$ddisty), dims = c(N, N_grid))
             # }
         }
     }
@@ -196,6 +191,7 @@ eval_basis <- function(
     }
 
     ## flatten the list of basis functions W to a single matrix
+    # D <- do.call(cbind, D)
     W <- do.call(cbind, W)
     dW <- do.call(cbind, dW)
     ddistx <- do.call(cbind, ddistx)
@@ -213,7 +209,6 @@ eval_basis <- function(
         M             = M,
         n_dims        = n_dims,
         dims_idx      = dims_idx,
-        n_neighbors   = n_neighbors,
         n_coarse_grid = n_coarse_grid,
         use_spam      = use_spam
     )

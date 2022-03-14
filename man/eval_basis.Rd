@@ -4,20 +4,12 @@
 \alias{eval_basis}
 \title{Evaluate the MRA basis}
 \usage{
-eval_basis(
-  locs,
-  grid,
-  n_neighbors = 68,
-  basis_type = "wendland",
-  use_spam = TRUE
-)
+eval_basis(locs, grid, basis_type = "wendland", use_spam = TRUE)
 }
 \arguments{
 \item{locs}{An N x 2 matrix of spatial locations}
 
 \item{grid}{A grid object that is the output of \code{make_grid}}
-
-\item{n_neighbors}{The expected number of neighbors based on the grid}
 
 \item{basis_type}{The basis function type. Currently only "wendland" is accepted}
 

@@ -46,6 +46,69 @@ namespace sgMRA {
         return Rcpp::as<Rcpp::List >(rcpp_result_gen);
     }
 
+    inline arma::mat distance_near_row_cpp(const double& i, const arma::rowvec& locs, const arma::mat& locs_grid, const double& radius, const bool& byrow = true) {
+        typedef SEXP(*Ptr_distance_near_row_cpp)(SEXP,SEXP,SEXP,SEXP,SEXP);
+        static Ptr_distance_near_row_cpp p_distance_near_row_cpp = NULL;
+        if (p_distance_near_row_cpp == NULL) {
+            validateSignature("arma::mat(*distance_near_row_cpp)(const double&,const arma::rowvec&,const arma::mat&,const double&,const bool&)");
+            p_distance_near_row_cpp = (Ptr_distance_near_row_cpp)R_GetCCallable("sgMRA", "_sgMRA_distance_near_row_cpp");
+        }
+        RObject rcpp_result_gen;
+        {
+            RNGScope RCPP_rngScope_gen;
+            rcpp_result_gen = p_distance_near_row_cpp(Shield<SEXP>(Rcpp::wrap(i)), Shield<SEXP>(Rcpp::wrap(locs)), Shield<SEXP>(Rcpp::wrap(locs_grid)), Shield<SEXP>(Rcpp::wrap(radius)), Shield<SEXP>(Rcpp::wrap(byrow)));
+        }
+        if (rcpp_result_gen.inherits("interrupted-error"))
+            throw Rcpp::internal::InterruptedException();
+        if (Rcpp::internal::isLongjumpSentinel(rcpp_result_gen))
+            throw Rcpp::LongjumpException(rcpp_result_gen);
+        if (rcpp_result_gen.inherits("try-error"))
+            throw Rcpp::exception(Rcpp::as<std::string>(rcpp_result_gen).c_str());
+        return Rcpp::as<arma::mat >(rcpp_result_gen);
+    }
+
+    inline arma::mat distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors = 86, const bool& byrow = true) {
+        typedef SEXP(*Ptr_distance_near_loop_cpp)(SEXP,SEXP,SEXP,SEXP,SEXP);
+        static Ptr_distance_near_loop_cpp p_distance_near_loop_cpp = NULL;
+        if (p_distance_near_loop_cpp == NULL) {
+            validateSignature("arma::mat(*distance_near_loop_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&)");
+            p_distance_near_loop_cpp = (Ptr_distance_near_loop_cpp)R_GetCCallable("sgMRA", "_sgMRA_distance_near_loop_cpp");
+        }
+        RObject rcpp_result_gen;
+        {
+            RNGScope RCPP_rngScope_gen;
+            rcpp_result_gen = p_distance_near_loop_cpp(Shield<SEXP>(Rcpp::wrap(locs)), Shield<SEXP>(Rcpp::wrap(locs_grid)), Shield<SEXP>(Rcpp::wrap(radius)), Shield<SEXP>(Rcpp::wrap(n_neighbors)), Shield<SEXP>(Rcpp::wrap(byrow)));
+        }
+        if (rcpp_result_gen.inherits("interrupted-error"))
+            throw Rcpp::internal::InterruptedException();
+        if (Rcpp::internal::isLongjumpSentinel(rcpp_result_gen))
+            throw Rcpp::LongjumpException(rcpp_result_gen);
+        if (rcpp_result_gen.inherits("try-error"))
+            throw Rcpp::exception(Rcpp::as<std::string>(rcpp_result_gen).c_str());
+        return Rcpp::as<arma::mat >(rcpp_result_gen);
+    }
+
+    inline Rcpp::List distance_near_chunk_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors = 86, const bool& byrow = true, const bool& joint_index = true, const int& ncores = 1) {
+        typedef SEXP(*Ptr_distance_near_chunk_cpp)(SEXP,SEXP,SEXP,SEXP,SEXP,SEXP,SEXP);
+        static Ptr_distance_near_chunk_cpp p_distance_near_chunk_cpp = NULL;
+        if (p_distance_near_chunk_cpp == NULL) {
+            validateSignature("Rcpp::List(*distance_near_chunk_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&,const bool&,const int&)");
+            p_distance_near_chunk_cpp = (Ptr_distance_near_chunk_cpp)R_GetCCallable("sgMRA", "_sgMRA_distance_near_chunk_cpp");
+        }
+        RObject rcpp_result_gen;
+        {
+            RNGScope RCPP_rngScope_gen;
+            rcpp_result_gen = p_distance_near_chunk_cpp(Shield<SEXP>(Rcpp::wrap(locs)), Shield<SEXP>(Rcpp::wrap(locs_grid)), Shield<SEXP>(Rcpp::wrap(radius)), Shield<SEXP>(Rcpp::wrap(n_neighbors)), Shield<SEXP>(Rcpp::wrap(byrow)), Shield<SEXP>(Rcpp::wrap(joint_index)), Shield<SEXP>(Rcpp::wrap(ncores)));
+        }
+        if (rcpp_result_gen.inherits("interrupted-error"))
+            throw Rcpp::internal::InterruptedException();
+        if (Rcpp::internal::isLongjumpSentinel(rcpp_result_gen))
+            throw Rcpp::LongjumpException(rcpp_result_gen);
+        if (rcpp_result_gen.inherits("try-error"))
+            throw Rcpp::exception(Rcpp::as<std::string>(rcpp_result_gen).c_str());
+        return Rcpp::as<Rcpp::List >(rcpp_result_gen);
+    }
+
 }
 
 #endif // RCPP_sgMRA_RCPPEXPORTS_H_GEN_

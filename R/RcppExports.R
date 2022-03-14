@@ -14,6 +14,49 @@ distance_near_with_ddist_cpp <- function(locs, locs_grid, radius, n_neighbors = 
     .Call('_sgMRA_distance_near_with_ddist_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors)
 }
 
+#' Calculate thresheld pairwise distance for a row
+#'
+#' @param i The row index
+#' @param locs An N x 2 matrix of spatial locations
+#' @param locs_grid An N_grid x 2 matrix of spatial grids
+#' @param radius The thresholded radius
+#' @param byrow Perform calculation row/column-wise
+#' @return The thresheld pairwise distance
+#'
+#' @export
+distance_near_row_cpp <- function(i, locs, locs_grid, radius, byrow = TRUE) {
+    .Call('_sgMRA_distance_near_row_cpp', PACKAGE = 'sgMRA', i, locs, locs_grid, radius, byrow)
+}
+
+#' Calculate thresheld pairwise distance for a row using loops for parallelization
+#'
+#' @param locs An N x 2 matrix of spatial locations
+#' @param locs_grid An N_grid x 2 matrix of spatial grids
+#' @param radius The thresholded radius
+#' @param n_neighbors The expected number of neighbors based on the MRA grid
+#' @return The thresheld pairwise distance
+#' @param byrow Perform calculation row/column-wise
+#'
+#' @export
+distance_near_loop_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = TRUE) {
+    .Call('_sgMRA_distance_near_loop_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow)
+}
+
+#' Calculate thresheld pairwise distance for a row using loops for parallelization
+#'
+#' @param locs An N x 2 matrix of spatial locations
+#' @param locs_grid An N_grid x 2 matrix of spatial grids
+#' @param radius The thresholded radius
+#' @param n_neighbors The expected number of neighbors based on the MRA grid
+#' @param byrow Perform calculation row/column-wise
+#' @param num_threads The number of openmp threads
+#' @return The thresheld pairwise distance
+#'
+#' @export
+distance_near_chunk_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = TRUE, joint_index = TRUE, ncores = 1L) {
+    .Call('_sgMRA_distance_near_chunk_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow, joint_index, ncores)
+}
+
 # Register entry points for exported C++ functions
 methods::setLoadAction(function(ns) {
     .Call('_sgMRA_RcppExport_registerCCallable', PACKAGE = 'sgMRA')

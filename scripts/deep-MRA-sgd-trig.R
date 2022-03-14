@@ -72,32 +72,34 @@ p1 + p2
 #     ggtitle("simulated layers")
 #
 # p_layers_sim
-message("Simulated loss:", 1 / (2 * N) * sum((y - z)^2))
+
 
 # Fit the model using sgd ----
 # source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 # source("~/sgMRA/R/adam.R")
-n_iter = 2000
+n_iter = 5000
+n_steps <- 50
 
-# add in Adam optimization schedule
+# linear schedule
+rate_schedule <- rep(seq(0.05, 0.001, length = n_steps), each = ceiling(n_iter / n_steps))
+# plot(rate_schedule)
+
+# exponential decay schedule
+# rate_schedule <- exp(rep(seq(log(0.1), log(0.001), length = n_steps), each = ceiling(n_iter / n_steps)))
+plot(rate_schedule)
+
+
+message("Simulated loss:", 1 / (2 * N) * sum((y - z)^2))
 # profvis::profvis({
 # system.time({
     out <- fit_sgd(y = y, locs = locs, grid = grid,
-                   alpha=NULL,
-                   alpha_x1=NULL,
-                   alpha_y1=NULL,
-                   alpha_x2=NULL,
-                   alpha_y2=NULL,
-                   # alpha=alpha,
-                   # alpha_x1=alpha_x1,
-                   # alpha_y1=alpha_y1,
-                   # alpha_x2=alpha_x2,
-                   # alpha_y2=alpha_y2,
-                   learn_rate = 0.1,
+                   # learn_rate = 0.001,
+                   rate_schedule=rate_schedule,
                    n_iter = n_iter,
                    n_message = 50,
-                   penalized=FALSE,
-                   plot_during_fit = TRUE)
+                   penalized=TRUE,
+                   plot_during_fit = TRUE,
+                   noisy=TRUE)
 
 # })
     # resume the GD with last model fit
@@ -109,11 +111,14 @@ n_iter = 2000
                    alpha_y1=out$alpha_y1,
                    alpha_x2=out$alpha_x2,
                    alpha_y2=out$alpha_y2,
-                   learn_rate = 0.1,
+                   # learn_rate = 0.001,
+                   rate_schedule=rate_schedule,
                    n_iter = n_iter,
                    n_message = 50,
-                   penalized=TRUE,
-                   plot_during_fit = TRUE)
+                   penalized=FALSE,
+                   plot_during_fit = TRUE,
+                   adam_pars = out$adam_pars,
+                   noisy=TRUE)
 # M=1, n_coarse_grid=10, layers = 3, fit-time:  elapsed, loss:
 # M=1, n_coarse_grid=10, layers = 2, fit-time: 364.731 elapsed, loss: 0.32
 # M=2, n_coarse_grid=30, layers = 2, fit-time: 1178.980 elapsed, loss: 0.0741

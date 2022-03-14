@@ -13,13 +13,16 @@ fit_sgd(
   alpha_y1 = NULL,
   alpha_x2 = NULL,
   alpha_y2 = NULL,
-  learn_rate,
+  learn_rate = 0.001,
+  rate_schedule = NULL,
   n_iter = 500,
   n_message = 50,
   penalized = FALSE,
   plot_during_fit = FALSE,
   use_spam = FALSE,
-  adam_pars = NULL
+  adam_pars = NULL,
+  sparse_outer = TRUE,
+  noisy = TRUE
 )
 }
 \arguments{
@@ -41,6 +44,8 @@ fit_sgd(
 
 \item{learn_rate}{The gradient descent learning rate}
 
+\item{rate_schedule}{If specified, the gradient descent learning rate schedule in decreasing values.}
+
 \item{n_iter}{The number of gradient descent iterations}
 
 \item{n_message}{The number of iterations between which to output a message}
@@ -52,6 +57,10 @@ fit_sgd(
 \item{use_spam}{Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices}
 
 \item{adam_pars}{The adam parameter state to allow restarting the model}
+
+\item{sparse_outer}{If \code{TRUE}, calculate the outer product in a sparse format. For all but the smallest models, this should be TRUE. I should make this automatic going forward}
+
+\item{noisy}{If \code{TRUE}, add random noise to the gradient.}
 }
 \value{
 

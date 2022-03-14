@@ -1,3 +1,39 @@
+make_D_ind <- function(MRA) {
+    n_layers <- length(MRA$n_dims)
+    D_ind <- vector(mode='list', length = n_layers)
+    if (n_layers == 1) {
+        D_ind <- MRA$D[[1]]$ind
+    } else {
+        D_ind[[1]] <- MRA$D[[1]]$ind
+        for (j in 2:n_layers) {
+            D_ind[[j]] <- MRA$D[[j]]$ind + cbind(rep(0, nrow(MRA$D[[j]]$ind)), sum(MRA$n_dims[1:(j-1)]))
+        }
+        D_ind = do.call(rbind, D_ind)
+    }
+    return(D_ind)
+}
+
+sparse_outer_W <- function(MRA, alpha, y) {
+
+    N <- length(y)
+    N_grid <- length(alpha)
+    D_ind = make_D_ind(MRA)
+    devs <- 1 / N * (MRA$W %*% alpha - y)
+    delta_W_sparse = devs[D_ind[, 1]] * alpha[D_ind[, 2]]
+    delta_W_sparse <- sparseMatrix(i=D_ind[, 1], j=D_ind[, 2], x=delta_W_sparse, dims=c(N, N_grid))
+    return(delta_W_sparse)
+}
+
+sparse_outer_layers <- function(delta, alpha, MRA) {
+
+    N <- length(delta)
+    N_grid <- length(alpha)
+    D_ind = make_D_ind(MRA)
+    delta_sparse = delta[D_ind[, 1]] * alpha[D_ind[, 2]]
+    delta_sparse <- sparseMatrix(i=D_ind[, 1], j=D_ind[, 2], x=delta_sparse, dims=c(N, N_grid))
+    return(delta_sparse)
+}
+
 update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             alpha,
                             alpha_x1, alpha_y1,
@@ -9,37 +45,67 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             m, v,
                             learn_rate,
                             penalized,
-                            use_spam) {
+                            use_spam,
+                            sparse_outer,
+                            noisy) {
 
     N <- length(y)
     # first layer w.r.t alpha
     delta <- drop(1 / N * (MRA$W %*% alpha - y))
     # first layer w.r.t W
-    delta_W <- (1 / N * (MRA$W %*% alpha - y)) %*% t(alpha)
+    if (sparse_outer) {
+        delta_W <- sparse_outer_W(MRA, alpha, y)
+    } else {
+        delta_W <- (1 / N * (MRA$W %*% alpha - y)) %*% t(alpha)
+    }
 
     # second layer
     delta_x1 <- rowSums(delta_W * (MRA$dW * MRA$ddistx))
     delta_y1 <- rowSums(delta_W * (MRA$dW * MRA$ddisty))
 
     # third layer
-    delta2 <- delta_x1 %*% t(alpha_x1) + delta_y1 %*% t(alpha_y1) # chain rule gradient tape
+    if (sparse_outer) {
+        delta2 <- sparse_outer_layers(delta_x1, alpha_x1, MRA1) +
+            sparse_outer_layers(delta_y1, alpha_y1, MRA1)
+    } else {
+        delta2 <- delta_x1 %*% t(alpha_x1) + delta_y1 %*% t(alpha_y1) # chain rule gradient tape
+    }
+
     delta_x2 <- rowSums(delta2 * MRA1$dW * MRA1$ddistx)
     delta_y2 <- rowSums(delta2 * MRA1$dW * MRA1$ddisty)
 
     # update the gradient with adam with a penalty
     if (penalized) {
-        grad <- list(t(MRA$W) %*% delta + Q %*% alpha / N,
-                     t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N,
-                     t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N,
-                     t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N,
-                     t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N)
+        if (noisy) {
+            grad <- list(t(MRA$W) %*% delta + Q %*% alpha / N + rnorm(length(alpha), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N + rnorm(length(alpha_x1), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N + rnorm(length(alpha_y1), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N + rnorm(length(alpha_x2), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N + rnorm(length(alpha_y2), 0, sqrt(0.3 / (1 + i)^(0.55))))
+        } else {
+            grad <- list(t(MRA$W) %*% delta + Q %*% alpha / N,
+                         t(MRA1$W) %*% delta_x1 + Q1 %*% alpha_x1 / N,
+                         t(MRA1$W) %*% delta_y1 + Q1 %*% alpha_y1 / N,
+                         t(MRA2$W) %*% delta_x2 + Q2 %*% alpha_x2 / N,
+                         t(MRA2$W) %*% delta_y2 + Q2 %*% alpha_y2 / N)
+        }
     } else {
         # update the gradient without a penalty term
-        grad <- list(t(MRA$W) %*% delta,
-                     t(MRA1$W) %*% delta_x1,
-                     t(MRA1$W) %*% delta_y1,
-                     t(MRA2$W) %*% delta_x2,
-                     t(MRA2$W) %*% delta_y2)
+        if (noisy) {
+            grad <- list(t(MRA$W) %*% delta + rnorm(length(alpha), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA1$W) %*% delta_x1 + rnorm(length(alpha_x1), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA1$W) %*% delta_y1 + rnorm(length(alpha_y1), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA2$W) %*% delta_x2 + rnorm(length(alpha_x2), 0, sqrt(0.3 / (1 + i)^(0.55))),
+                         t(MRA2$W) %*% delta_y2 + rnorm(length(alpha_y2), 0, sqrt(0.3 / (1 + i)^(0.55))))
+
+        } else {
+
+            grad <- list(t(MRA$W) %*% delta,
+                         t(MRA1$W) %*% delta_x1,
+                         t(MRA1$W) %*% delta_y1,
+                         t(MRA2$W) %*% delta_x2,
+                         t(MRA2$W) %*% delta_y2)
+        }
     }
 
     adam_out <- adam(i, grad, m, v)
@@ -73,16 +139,20 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 #' @param alpha_x2 If specified, the second hidden layer MRA parameters for the x-axis variable
 #' @param alpha_y2 If specified, the second hidden layer MRA parameters for the y-axis variable
 #' @param learn_rate The gradient descent learning rate
+#' @param rate_schedule If specified, the gradient descent learning rate schedule in decreasing values.
 #' @param n_iter The number of gradient descent iterations
 #' @param n_message The number of iterations between which to output a message
 #' @param penalized Fit using a penalty term
 #' @param plot_during_fit Plot the current parameter states every \code{n_message} iterations
 #' @param use_spam Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices
 #' @param adam_pars The adam parameter state to allow restarting the model
+#' @param sparse_outer If \code{TRUE}, calculate the outer product in a sparse format. For all but the smallest models, this should be TRUE. I should make this automatic going forward
+#' @param noisy If \code{TRUE}, add random noise to the gradient.
 #'
 #' @return
 #' @export
 #'
+#' @import Matrix spam
 #'
 fit_sgd <- function(y,
                     locs,
@@ -92,13 +162,21 @@ fit_sgd <- function(y,
                     alpha_y1 = NULL,
                     alpha_x2 = NULL,
                     alpha_y2 = NULL,
-                    learn_rate, n_iter=500,
+                    learn_rate = 0.001,
+                    rate_schedule=NULL,
+                    n_iter=500,
                     n_message = 50,
                     penalized = FALSE,
                     plot_during_fit = FALSE,
                     use_spam = FALSE,
-                    adam_pars = NULL) {
+                    adam_pars = NULL,
+                    sparse_outer = TRUE,
+                    noisy=TRUE) {
 
+
+    if (is.null(rate_schedule)) {
+        rate_schedule <- rep(learn_rate, n_iter)
+    }
 
     N <- length(y)
 
@@ -230,7 +308,7 @@ fit_sgd <- function(y,
 
     # plot the data
     if (plot_during_fit) {
-        dat <- data.frame(x = locs$x, y = locs$y, z = z, y_obs = y_obs)
+        dat <- data.frame(x = locs$x, y = locs$y, z = drop(z), y_obs = drop(y_obs))
         p1 <- ggplot(dat, aes(x = x, y = y, fill = z)) +
             geom_raster() +
             scale_fill_viridis_c()
@@ -280,9 +358,11 @@ fit_sgd <- function(y,
                                 Q, Q1, Q2,
                                 i,
                                 m, v,
-                                learn_rate,
+                                rate_schedule[i],
                                 penalized,
-                                use_spam)
+                                use_spam,
+                                sparse_outer,
+                                noisy)
         alpha <- pars$alpha
         alpha_x1 <- pars$alpha_x1
         alpha_y1 <- pars$alpha_y1

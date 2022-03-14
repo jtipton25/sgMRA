@@ -10,6 +10,7 @@
 #' @return
 #' @export
 #'
+#' @importFrom tidyr expand_grid
 #'
 sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
                          n_layers = 3, sigma = 0.25, use_spam = FALSE) {
@@ -22,41 +23,50 @@ sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
     # initialize the MRA parameters
     MRA <- vector(mode = 'list', length = n_layers)
     Q <- vector(mode = 'list', length = n_layers)
+    # CH <- vector(mode = 'list', length = n_layers)
     alpha_x <- vector(mode = 'list', length = n_layers-1)
     alpha_y <- vector(mode = 'list', length = n_layers-1)
 
     # initialize the bottom layer
     MRA[[n_layers]] <- eval_basis(locs, grid, use_spam)
-    Q[[n_layers]] <- make_Q_alpha_2d(sqrt(MRA[[n_layers]]$n_dims),
-                                     phi=rep(0.9, length(MRA[[n_layers]]$n_dims)))
-    if (length(MRA[[n_layers]]$n_dims) > 1) {
-        Q[[n_layers]] <- do.call(bdiag.spam, Q[[n_layers]])
-    }
-    class(Q[[n_layers]]) <- "spam"
+    Q[[n_layers]] <- make_Q(sqrt(MRA[[n_layers]]$n_dims),
+                            phi=rep(0.9, length(MRA[[n_layers]]$n_dims)),
+                            use_spam = use_spam)
+    # if (!use_spam) {
+    #     CH[[n_layers]] <- Cholesky(Q[[n_layers]])
+    # }
+
+    # if (length(MRA[[n_layers]]$n_dims) > 1) {
+    #     Q[[n_layers]] <- do.call(bdiag.spam, Q[[n_layers]])
+    # }
+    # class(Q[[n_layers]]) <- "spam"
 
     # initialize the middle layers
     if (n_layers > 1) {
         for (j in n_layers:2) {
-            alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 1)
-            alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 1)
-            # alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
-            # alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
+            # alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 1)
+            # alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 1)
+            alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
+            alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
 
-            MRA[[j-1]] <- eval_basis(cbind(MRA[[j]]$W %*% alpha_x[[j-1]], MRA[[j]]$W %*% alpha_y[[j-1]]), grid)
-            Q[[j-1]] <- make_Q_alpha_2d(sqrt(MRA[[j-1]]$n_dims),
-                                      phi=rep(0.9, length(MRA[[j-1]]$n_dims)))
-            if (length(MRA[[j-1]]$n_dims) > 1) {
-                Q[[j-1]] <- do.call(bdiag.spam, Q[[j-1]])
-            }
-            class(Q[[j-1]]) <- "spam"
+            MRA[[j-1]] <- eval_basis(cbind(MRA[[j]]$W %*% alpha_x[[j-1]], MRA[[j]]$W %*% alpha_y[[j-1]]), grid, use_spam = use_spam)
+            Q[[j-1]] <- make_Q(sqrt(MRA[[j-1]]$n_dims),
+                                      phi=rep(0.9, length(MRA[[j-1]]$n_dims)), use_spam = use_spam)
+
+            # Q[[j-1]] <- make_Q_alpha_2d(sqrt(MRA[[j-1]]$n_dims),
+            #                           phi=rep(0.9, length(MRA[[j-1]]$n_dims)))
+            # if (length(MRA[[j-1]]$n_dims) > 1) {
+            #     Q[[j-1]] <- do.call(bdiag.spam, Q[[j-1]])
+            # }
+            # class(Q[[j-1]]) <- "spam"
         }
     }
 
     # initialize the top layer
 
     # if (is.null(alpha)) {
-    # alpha <- rnorm(ncol(MRA[[1]]$W), 0, 0.1)
-    alpha <- rnorm(ncol(MRA[[1]]$W), 0, 1)
+    alpha <- rnorm(ncol(MRA[[1]]$W), 0, 0.1)
+    # alpha <- rnorm(ncol(MRA[[1]]$W), 0, 1)
     # }
 
     z <- MRA[[1]]$W %*% alpha
