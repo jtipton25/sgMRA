@@ -159,18 +159,28 @@ arma::mat distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_gr
 //' @param radius The thresholded radius
 //' @param n_neighbors The expected number of neighbors based on the MRA grid
 //' @param byrow Perform calculation row/column-wise
-//' @param num_threads The number of openmp threads
+//' @param nchunks The number chunks to divide the data into
+//' @param ncores The number of openmp threads
 //' @return The thresheld pairwise distance
 //'
 //' @export
 //[[Rcpp::export]]
-Rcpp::List distance_near_chunk_cpp(const arma::mat& locs,
-                                   const arma::mat& locs_grid,
-                                   const double& radius,
-                                   const int& n_neighbors=86,
-                                   const bool& byrow=true,
-                                   const bool& joint_index=true,
-                                   const int& ncores=1) {
+arma::field<arma::mat> distance_near_chunk_cpp(const arma::mat& locs,
+                                       const arma::mat& locs_grid,
+                                       const double& radius,
+                                       const int& n_neighbors=86,
+                                       const bool& byrow=true,
+                                       const bool& joint_index=true,
+                                       Rcpp::Nullable<int> nchunks=R_NilValue,
+                                       const int& ncores=1) {
+        // Rcpp::List distance_near_chunk_cpp(const arma::mat& locs,
+        //                            const arma::mat& locs_grid,
+        //                            const double& radius,
+        //                            const int& n_neighbors=86,
+        //                            const bool& byrow=true,
+        //                            const bool& joint_index=true,
+        //                            Rcpp::Nullable<int> nchunks=R_NilValue,
+        //                            const int& ncores=1) {
     // Rcpp::List distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors=86) {
 
     // https://stackoverflow.com/questions/26514691/dynamically-readjustable-arrays-and-openmp
@@ -187,32 +197,54 @@ Rcpp::List distance_near_chunk_cpp(const arma::mat& locs,
 
     // define some code chunks
     int N = locs.n_rows;
-    arma::vec chunk_size(ncores, arma::fill::ones);
-    chunk_size *= N / ncores;
+    int n_chunks;
+    if (nchunks.isNotNull()) {
+        n_chunks = as<int>(nchunks);
+    } else {
+        n_chunks = ncores;
+    }
+
+    if (n_chunks < ncores) {
+        // make there be at least as many chunks as cores
+        n_chunks = ncores;
+    }
+
+    arma::vec chunk_size(n_chunks, arma::fill::ones);
+    chunk_size *= N / n_chunks;
     // Rcpp::Rcout << "Chunk size = " << chunk_size << "\n";
-    // Rcpp::Rcout << "N % ncores = " <<  N % ncores << "\n";
-    if (N % ncores != 0) {
-        // Rcpp::Rcout << "Chunk subvec" << chunk_size.subvec(0, N % ncores - 1) << "\n";
-        chunk_size.subvec(0, N % ncores - 1) += 1;
+    // Rcpp::Rcout << "N % n_chunks = " <<  N % n_chunks << "\n";
+    if (N % n_chunks != 0) {
+        // Rcpp::Rcout << "Chunk subvec" << chunk_size.subvec(0, N % n_chunks - 1) << "\n";
+        chunk_size.subvec(0, N % n_chunks - 1) += 1;
     }
     // Rcpp::Rcout << "Chunk size = " << chunk_size << "\n";
     // Rcpp::Rcout << "total Chunk size = " << sum(chunk_size) << "\n";
 
-    int max_points_loop = 2 * n_neighbors * N / ncores;
+    int max_points_loop = 2 * n_neighbors * N / n_chunks;
 
-    Rcpp::List out_list(ncores);
+    // Rcpp::List out_list(n_chunks);
+    // using arma::field rather than Rcpp::List https://stackoverflow.com/questions/29195019/subset-armadillo-field
+    arma::field<arma::mat> out_list(n_chunks, 1);
+
+    for (int j=0; j<n_chunks; j++) {
+        if (byrow) {
+            out_list(j) = arma::mat(5, max_points_loop);
+        } else {
+            out_list(j) = arma::mat(max_points_loop, 5);
+        }
+    }
 
 #if defined(_OPENMP)
 #pragma omp parallel num_threads(ncores) if (ncores > 1)
 #pragma omp for
 #endif
-    for (int j=0; j<ncores; j++) {
-        arma::mat out;
-        if (byrow) {
-            out.resize(5, max_points_loop);
-        } else {
-            out.resize(max_points_loop, 5);
-        }
+    for (int j=0; j<n_chunks; j++) {
+        // arma::mat out;
+        // if (byrow) {
+        //     out.resize(5, max_points_loop);
+        // } else {
+        //     out.resize(max_points_loop, 5);
+        // }
 
 
         int start_index;
@@ -236,17 +268,17 @@ Rcpp::List distance_near_chunk_cpp(const arma::mat& locs,
             }
             if (joint_index) {
                 if (byrow) {
-                    out.cols(idx, idx+n_tmp-1) = tmp;
+                    out_list(j).cols(idx, idx+n_tmp-1) = tmp;
                 } else {
-                    out.rows(idx, idx+n_tmp-1) = tmp;
+                    out_list(j).rows(idx, idx+n_tmp-1) = tmp;
                 }
                 idx += n_tmp;
             } else {
                 for (int j=0; j<n_tmp; j++) {
                     if (byrow) {
-                        out.col(idx) = tmp.col(j);
+                        out_list(j).col(idx) = tmp.col(j);
                     } else {
-                        out.row(idx) = tmp.row(j);
+                        out_list(j).row(idx) = tmp.row(j);
                     }
                     idx++;
                 }
@@ -254,13 +286,13 @@ Rcpp::List distance_near_chunk_cpp(const arma::mat& locs,
         }
         // Resize the result
         if (byrow) {
-            out.resize(5, idx);
+            out_list(j).resize(5, idx);
         } else {
-            out.resize(idx, 5);
+            out_list(j).resize(idx, 5);
         }
 
         // save to a list -- try and make this more efficient
-        out_list(j) = out;
+        // out_list(j) = out;
     }
 
     // return the result

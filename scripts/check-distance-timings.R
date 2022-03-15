@@ -16,7 +16,7 @@ set.seed(404)
 N <- 2^16
 
 M <- 3
-n_coarse_grid <- 40#80
+n_coarse_grid <- 80
 # N <- 2^12
 # M <- 1
 # n_coarse_grid <- 80
@@ -152,41 +152,53 @@ D6 <- distance_near_loop_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
 time_loop_end <- Sys.time()
 
 
+# nchunks doesn't seem to matter too much... at least for N approx 65K
 time_openmp_start <- Sys.time()
 D5 <- distance_near_chunk_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
-                              radius = grid$radius[m], byrow=FALSE, ncores=6, joint_index=TRUE)
+                              radius = grid$radius[m], byrow=FALSE,
+                              nchunks = 16,
+                              ncores=16, joint_index=TRUE)
 time_openmp_end <- Sys.time()
 print(paste("openmp time took:", round(difftime(time_openmp_end, time_openmp_start, units="secs"), digits=2), "seconds"))
 print(paste("loop time took:", round(difftime(time_loop_end, time_loop_start, units="secs"), digits=2), "seconds"))
 print(paste("cpp time took:", round(difftime(time_cpp_end, time_cpp_start, units="secs"), digits=2), "seconds"))
 
+# check the output
+D_out <- do.call(rbind, D5)
+all.equal(D2$ind, D_out[, 1:2])
+all.equal(drop(D2$V), D_out[, 3])
+all.equal(drop(D2$ddistx), D_out[, 4])
+all.equal(drop(D2$ddisty), D_out[, 5])
+
 
 fun <- function(n) {
     tmp=distance_near_chunk_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
                             radius = grid$radius[m], byrow=FALSE, ncores=n, joint_index=TRUE)
+    rm(tmp)
 }
 fun0 <- function() {
     tmp=distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
                              radius = grid$radius[m])
+    rm(tmp)
 }
 
 bm <- microbenchmark::microbenchmark(
-    fun0,
+    fun0(),
     fun(1),
     fun(2),
     fun(4),
-    fun(5),
     fun(6),
-    fun(7),
-    times=2)
-bm
+    fun(8),
+    fun(16),
+    fun(24),
+    fun(36),
+    fun(48),
+    fun(56),
+    times=20)
+print(bm, unit='relative')
 autoplot(bm)
 
-# check the output
-all.equal(D2$ind, do.call(rbind, D5)[, 1:2])
-all.equal(drop(D2$V), do.call(rbind, D5)[, 3])
-all.equal(drop(D2$ddistx), do.call(rbind, D5)[, 4])
-all.equal(drop(D2$ddisty), do.call(rbind, D5)[, 5])
+
 # when ncores = 1
 # all.equal(D2$ind, D5[[1]][, 1:2])
 # all.equal(drop(D2$V), D5[[1]][, 3])
@@ -195,8 +207,8 @@ all.equal(drop(D2$ddisty), do.call(rbind, D5)[, 5])
 
 
 
-str(D4)
-microbenchmark::microbenchmark()
+
+# microbenchmark::microbenchmark()
 
 
 

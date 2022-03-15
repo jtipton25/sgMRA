@@ -128,8 +128,8 @@ RcppExport SEXP _sgMRA_distance_near_loop_cpp(SEXP locsSEXP, SEXP locs_gridSEXP,
     return rcpp_result_gen;
 }
 // distance_near_chunk_cpp
-Rcpp::List distance_near_chunk_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors, const bool& byrow, const bool& joint_index, const int& ncores);
-static SEXP _sgMRA_distance_near_chunk_cpp_try(SEXP locsSEXP, SEXP locs_gridSEXP, SEXP radiusSEXP, SEXP n_neighborsSEXP, SEXP byrowSEXP, SEXP joint_indexSEXP, SEXP ncoresSEXP) {
+arma::field<arma::mat> distance_near_chunk_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors, const bool& byrow, const bool& joint_index, Rcpp::Nullable<int> nchunks, const int& ncores);
+static SEXP _sgMRA_distance_near_chunk_cpp_try(SEXP locsSEXP, SEXP locs_gridSEXP, SEXP radiusSEXP, SEXP n_neighborsSEXP, SEXP byrowSEXP, SEXP joint_indexSEXP, SEXP nchunksSEXP, SEXP ncoresSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type locs(locsSEXP);
@@ -138,16 +138,17 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const int& >::type n_neighbors(n_neighborsSEXP);
     Rcpp::traits::input_parameter< const bool& >::type byrow(byrowSEXP);
     Rcpp::traits::input_parameter< const bool& >::type joint_index(joint_indexSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<int> >::type nchunks(nchunksSEXP);
     Rcpp::traits::input_parameter< const int& >::type ncores(ncoresSEXP);
-    rcpp_result_gen = Rcpp::wrap(distance_near_chunk_cpp(locs, locs_grid, radius, n_neighbors, byrow, joint_index, ncores));
+    rcpp_result_gen = Rcpp::wrap(distance_near_chunk_cpp(locs, locs_grid, radius, n_neighbors, byrow, joint_index, nchunks, ncores));
     return rcpp_result_gen;
 END_RCPP_RETURN_ERROR
 }
-RcppExport SEXP _sgMRA_distance_near_chunk_cpp(SEXP locsSEXP, SEXP locs_gridSEXP, SEXP radiusSEXP, SEXP n_neighborsSEXP, SEXP byrowSEXP, SEXP joint_indexSEXP, SEXP ncoresSEXP) {
+RcppExport SEXP _sgMRA_distance_near_chunk_cpp(SEXP locsSEXP, SEXP locs_gridSEXP, SEXP radiusSEXP, SEXP n_neighborsSEXP, SEXP byrowSEXP, SEXP joint_indexSEXP, SEXP nchunksSEXP, SEXP ncoresSEXP) {
     SEXP rcpp_result_gen;
     {
         Rcpp::RNGScope rcpp_rngScope_gen;
-        rcpp_result_gen = PROTECT(_sgMRA_distance_near_chunk_cpp_try(locsSEXP, locs_gridSEXP, radiusSEXP, n_neighborsSEXP, byrowSEXP, joint_indexSEXP, ncoresSEXP));
+        rcpp_result_gen = PROTECT(_sgMRA_distance_near_chunk_cpp_try(locsSEXP, locs_gridSEXP, radiusSEXP, n_neighborsSEXP, byrowSEXP, joint_indexSEXP, nchunksSEXP, ncoresSEXP));
     }
     Rboolean rcpp_isInterrupt_gen = Rf_inherits(rcpp_result_gen, "interrupted-error");
     if (rcpp_isInterrupt_gen) {
@@ -175,7 +176,7 @@ static int _sgMRA_RcppExport_validate(const char* sig) {
         signatures.insert("Rcpp::List(*distance_near_with_ddist_cpp)(arma::mat&,arma::mat&,double&,const int&)");
         signatures.insert("arma::mat(*distance_near_row_cpp)(const double&,const arma::rowvec&,const arma::mat&,const double&,const bool&)");
         signatures.insert("arma::mat(*distance_near_loop_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&)");
-        signatures.insert("Rcpp::List(*distance_near_chunk_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&,const bool&,const int&)");
+        signatures.insert("arma::field<arma::mat>(*distance_near_chunk_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&,const bool&,Rcpp::Nullable<int>,const int&)");
     }
     return signatures.find(sig) != signatures.end();
 }
@@ -194,7 +195,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_sgMRA_distance_near_with_ddist_cpp", (DL_FUNC) &_sgMRA_distance_near_with_ddist_cpp, 4},
     {"_sgMRA_distance_near_row_cpp", (DL_FUNC) &_sgMRA_distance_near_row_cpp, 5},
     {"_sgMRA_distance_near_loop_cpp", (DL_FUNC) &_sgMRA_distance_near_loop_cpp, 5},
-    {"_sgMRA_distance_near_chunk_cpp", (DL_FUNC) &_sgMRA_distance_near_chunk_cpp, 7},
+    {"_sgMRA_distance_near_chunk_cpp", (DL_FUNC) &_sgMRA_distance_near_chunk_cpp, 8},
     {"_sgMRA_RcppExport_registerCCallable", (DL_FUNC) &_sgMRA_RcppExport_registerCCallable, 0},
     {NULL, NULL, 0}
 };

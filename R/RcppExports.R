@@ -49,12 +49,13 @@ distance_near_loop_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, b
 #' @param radius The thresholded radius
 #' @param n_neighbors The expected number of neighbors based on the MRA grid
 #' @param byrow Perform calculation row/column-wise
-#' @param num_threads The number of openmp threads
+#' @param nchunks The number chunks to divide the data into
+#' @param ncores The number of openmp threads
 #' @return The thresheld pairwise distance
 #'
 #' @export
-distance_near_chunk_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = TRUE, joint_index = TRUE, ncores = 1L) {
-    .Call('_sgMRA_distance_near_chunk_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow, joint_index, ncores)
+distance_near_chunk_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = TRUE, joint_index = TRUE, nchunks = NULL, ncores = 1L) {
+    .Call('_sgMRA_distance_near_chunk_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow, joint_index, nchunks, ncores)
 }
 
 # Register entry points for exported C++ functions
