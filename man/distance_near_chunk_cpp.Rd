@@ -11,6 +11,7 @@ distance_near_chunk_cpp(
   n_neighbors = 86L,
   byrow = TRUE,
   joint_index = TRUE,
+  nchunks = NULL,
   ncores = 1L
 )
 }
@@ -25,7 +26,9 @@ distance_near_chunk_cpp(
 
 \item{byrow}{Perform calculation row/column-wise}
 
-\item{num_threads}{The number of openmp threads}
+\item{nchunks}{The number chunks to divide the data into}
+
+\item{ncores}{The number of openmp threads}
 }
 \value{
 The thresheld pairwise distance

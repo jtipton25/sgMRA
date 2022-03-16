@@ -4,6 +4,11 @@
 // [[Rcpp::interfaces(r, cpp)]]
 // [[Rcpp::plugins(openmp)]]
 
+// Protect against compilers without OpenMP
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 using namespace Rcpp;
 using namespace arma;
 
@@ -235,8 +240,7 @@ arma::field<arma::mat> distance_near_chunk_cpp(const arma::mat& locs,
     }
 
 #if defined(_OPENMP)
-#pragma omp parallel num_threads(ncores) if (ncores > 1)
-#pragma omp for
+#pragma omp parallel for num_threads(ncores) if (ncores > 1)
 #endif
     for (int j=0; j<n_chunks; j++) {
         // arma::mat out;

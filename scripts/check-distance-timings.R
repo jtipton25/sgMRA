@@ -13,7 +13,7 @@ library(sgMRA)
 
 set.seed(404)
 
-N <- 2^16
+N <- 2^14
 
 M <- 3
 n_coarse_grid <- 80
@@ -152,12 +152,12 @@ D6 <- distance_near_loop_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
 time_loop_end <- Sys.time()
 
 
-# nchunks doesn't seem to matter too much... at least for N approx 65K
+# nchunks doesn't seem to matter too much... at least for N approx 65K.
 time_openmp_start <- Sys.time()
 D5 <- distance_near_chunk_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
                               radius = grid$radius[m], byrow=FALSE,
-                              nchunks = 16,
-                              ncores=16, joint_index=TRUE)
+                              nchunks = 6,
+                              ncores=6, joint_index=TRUE)
 time_openmp_end <- Sys.time()
 print(paste("openmp time took:", round(difftime(time_openmp_end, time_openmp_start, units="secs"), digits=2), "seconds"))
 print(paste("loop time took:", round(difftime(time_loop_end, time_loop_start, units="secs"), digits=2), "seconds"))
@@ -171,9 +171,9 @@ all.equal(drop(D2$ddistx), D_out[, 4])
 all.equal(drop(D2$ddisty), D_out[, 5])
 
 
-fun <- function(n) {
+fun <- function(n, nchunks=n) {
     tmp=distance_near_chunk_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
-                            radius = grid$radius[m], byrow=FALSE, ncores=n, joint_index=TRUE)
+                            radius = grid$radius[m], byrow=FALSE, nchunks=nchunks, ncores=n, joint_index=TRUE)
     rm(tmp)
 }
 fun0 <- function() {
@@ -184,17 +184,20 @@ fun0 <- function() {
 
 bm <- microbenchmark::microbenchmark(
     fun0(),
-    fun(1),
-    fun(2),
-    fun(4),
+    # fun(1),
+    # fun(2),
+    # fun(4),
     fun(6),
-    fun(8),
-    fun(16),
-    fun(24),
-    fun(36),
-    fun(48),
-    fun(56),
-    times=20)
+    fun(6, nchunks=100*6),
+    # fun(8),
+    # fun(10),
+    # fun(16),
+    # fun(24),
+    # fun(36),
+    # fun(48),
+    # fun(56),
+    times=10)
+bm
 print(bm, unit='relative')
 autoplot(bm)
 
