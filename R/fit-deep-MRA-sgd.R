@@ -47,7 +47,9 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             penalized,
                             use_spam,
                             sparse_outer,
-                            noisy) {
+                            noisy,
+                            ncores,
+                            nchunks) {
 
     N <- length(y)
     # first layer w.r.t alpha
@@ -117,8 +119,8 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 
 
     # the forward pass on the sgMRA
-    MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid, use_spam=use_spam)
-    MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid, use_spam=use_spam)
+    MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
+    MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
 
     return(list(alpha = alpha, alpha_x1 = alpha_x1, alpha_y1 = alpha_y1,
                 alpha_x2 = alpha_x2, alpha_y2 = alpha_y2,
@@ -148,6 +150,9 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 #' @param adam_pars The adam parameter state to allow restarting the model
 #' @param sparse_outer If \code{TRUE}, calculate the outer product in a sparse format. For all but the smallest models, this should be TRUE. I should make this automatic going forward
 #' @param noisy If \code{TRUE}, add random noise to the gradient.
+#' @param ncores The number of cores to use for parallelization
+#' @param nchunks The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.
+
 #'
 #' @return
 #' @export
@@ -171,7 +176,9 @@ fit_sgd <- function(y,
                     use_spam = FALSE,
                     adam_pars = NULL,
                     sparse_outer = TRUE,
-                    noisy=TRUE) {
+                    noisy=TRUE,
+                    ncores        = 1L,
+                    nchunks       = NULL) {
 
 
     if (is.null(rate_schedule)) {
@@ -182,7 +189,7 @@ fit_sgd <- function(y,
 
 
     # initialize the MRA parameters here
-    MRA2 <- eval_basis(locs, grid, use_spam=use_spam)
+    MRA2 <- eval_basis(locs, grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
     Q2 <- make_Q(sqrt(MRA2$n_dims), phi=rep(0.9, length(MRA2$n_dims)), use_spam=use_spam)
     if (!use_spam) {
         CH2 <- Cholesky(Q2)
@@ -224,7 +231,7 @@ fit_sgd <- function(y,
         }
     }
 
-    MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid, use_spam=use_spam)
+    MRA1 <- eval_basis(cbind(MRA2$W %*% alpha_x2, MRA2$W %*% alpha_y2), grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
     Q1 <- make_Q(sqrt(MRA1$n_dims), phi=rep(0.9, length(MRA1$n_dims)), use_spam=use_spam)
     if (!use_spam) {
         CH1 <- Cholesky(Q1)
@@ -267,7 +274,7 @@ fit_sgd <- function(y,
         }
     }
 
-    MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid, use_spam=use_spam)
+    MRA <- eval_basis(cbind(MRA1$W %*% alpha_x1, MRA1$W %*% alpha_y1), grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
     Q <- make_Q(sqrt(MRA$n_dims), phi=rep(0.9, length(MRA$n_dims)), use_spam=use_spam)
     if (!use_spam) {
         CH <- Cholesky(Q)
@@ -351,18 +358,25 @@ fit_sgd <- function(y,
     for (i in 1:n_iter) {
 
 
-        pars <- update_deep_mra(y, locs, grid, MRA, MRA1, MRA2,
+        pars <- update_deep_mra(y = y,
+                                locs = locs,
+                                grid = grid,
+                                MRA = MRA,
+                                MRA1 = MRA1,
+                                MRA2 = MRA2,
                                 alpha,
                                 alpha_x1, alpha_y1,
                                 alpha_x2, alpha_y2,
                                 Q, Q1, Q2,
                                 i,
                                 m, v,
-                                rate_schedule[i],
-                                penalized,
-                                use_spam,
-                                sparse_outer,
-                                noisy)
+                                learn_rate   =  rate_schedule[i],
+                                penalized    = penalized,
+                                use_spam     = use_spam,
+                                sparse_outer = sparse_outer,
+                                noisy        = noisy,
+                                ncores       = ncores,
+                                nchunks      = nchunks)
         alpha <- pars$alpha
         alpha_x1 <- pars$alpha_x1
         alpha_y1 <- pars$alpha_y1

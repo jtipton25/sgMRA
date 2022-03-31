@@ -19,15 +19,15 @@ library(sgMRA)
 
 set.seed(404)
 
-N <- 80^2#2^12
+N <- 2^16
 
 M <- 3
-n_coarse_grid <- 50
+n_coarse_grid <- 30
 # N <- 2^12
 # M <- 1
 # n_coarse_grid <- 80
 # source("~/sgMRA/R/sim-deep-mra.R")
-dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.1, use_spam = FALSE)
+dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.005, use_spam = FALSE, ncores = 32L)
 
 y=dat_sim$y
 grid=dat_sim$grid
@@ -93,31 +93,32 @@ p_layers_sim
 1 / (2*N) * sum((dat_sim$y - dat_sim$MRA[[1]]$W %*% dat_sim$alpha)^2)
 
 # Fit the model using sgd ----
-n_iter = 5#2000
+n_iter = 2000
 
 # add in Adam optimization schedule
 
 
 # Dense times ----
-start_dense <- Sys.time()
-out <- fit_sgd(y=dat_sim$y,
-               locs=dat_sim$locs,
-               grid=dat_sim$grid,
-               alpha=NULL,
-               alpha_x1=NULL,
-               alpha_y1=NULL,
-               alpha_x2=NULL,
-               alpha_y2=NULL,
-               learn_rate = 0.1,
-               n_iter = n_iter,
-               n_message = 50,
-               penalized = TRUE,
-               plot_during_fit = TRUE,
-               use_spam=FALSE,
-               sparse_outer=FALSE)
-end_dense <- Sys.time()
-time_dense <- end_dense - start_dense
-
+# start_dense <- Sys.time()
+# out <- fit_sgd(y=dat_sim$y,
+#                locs=dat_sim$locs,
+#                grid=dat_sim$grid,
+#                alpha=NULL,
+#                alpha_x1=NULL,
+#                alpha_y1=NULL,
+#                alpha_x2=NULL,
+#                alpha_y2=NULL,
+#                learn_rate = 0.1,
+#                n_iter = n_iter,
+#                n_message = 50,
+#                penalized = TRUE,
+#                plot_during_fit = TRUE,
+#                use_spam=FALSE,
+#                sparse_outer=FALSE,
+#                ncores = 32L)
+# end_dense <- Sys.time()
+# time_dense <- end_dense - start_dense
+#
 # Sparse Times ----
 start_sparse <- Sys.time()
 out <- fit_sgd(y=dat_sim$y,
@@ -128,18 +129,19 @@ out <- fit_sgd(y=dat_sim$y,
                alpha_y1=NULL,
                alpha_x2=NULL,
                alpha_y2=NULL,
-               learn_rate = 0.1,
+               learn_rate = 0.01,
                n_iter = n_iter,
                n_message = 50,
                penalized = TRUE,
                plot_during_fit = TRUE,
                use_spam=FALSE,
-               sparse_outer=TRUE)
+               sparse_outer=TRUE,
+               ncores = 32L)
 end_sparse <- Sys.time()
 time_sparse <- end_sparse - start_sparse
 
 # about a 10-fold speedup! Also, can only scale memory-wise with sparse model
-print(paste("Dense time took:", round(difftime(end_dense, start_dense, units="secs"), digits = 2), "seconds"))
+# print(paste("Dense time took:", round(difftime(end_dense, start_dense, units="secs"), digits = 2), "seconds"))
 print(paste("Sparse time took:", round(difftime(end_sparse, start_sparse, units="secs"), digits=2), "seconds"))
 
 
@@ -180,7 +182,7 @@ p_layers_sim / p_layers_fit
 
 
 dat <- data.frame(x = locs$x, y = locs$y,
-                  z = z,
+                  z = drop(z),
                   z_fit = drop(out$MRA$W %*% out$alpha))
 
 p_fit <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +

@@ -6,6 +6,8 @@
 #' @param n_layers The number of layers in the deep process
 #' @param sigma The observation standard deviation
 #' @param use_spam A logical value of whether to use the spam library (use_spam=TRUE) or the Matrix library (use_spam=FALSE) for sparse matrix calculations
+#' @param ncores The number of cores to use for parallelization
+#' @param nchunks The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.
 #'
 #' @return
 #' @export
@@ -13,7 +15,7 @@
 #' @importFrom tidyr expand_grid
 #'
 sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
-                         n_layers = 3, sigma = 0.25, use_spam = FALSE) {
+                         n_layers = 3, sigma = 0.25, use_spam = FALSE, ncores = 1L, nchunks = NULL) {
 
     # define the locations and grid
     locs <- expand_grid(x=seq(0, 1, length.out=sqrt(N)),
@@ -28,7 +30,7 @@ sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
     alpha_y <- vector(mode = 'list', length = n_layers-1)
 
     # initialize the bottom layer
-    MRA[[n_layers]] <- eval_basis(locs, grid, use_spam)
+    MRA[[n_layers]] <- eval_basis(locs, grid, use_spam = use_spam, ncores = ncores, nchunks = nchunks)
     Q[[n_layers]] <- make_Q(sqrt(MRA[[n_layers]]$n_dims),
                             phi=rep(0.9, length(MRA[[n_layers]]$n_dims)),
                             use_spam = use_spam)
@@ -49,7 +51,7 @@ sim_deep_mra <- function(N = 100^2, M = 1, n_coarse_grid = 20,
             alpha_x[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
             alpha_y[[j-1]] <- rnorm(ncol(MRA[[j]]$W), 0, 0.1)
 
-            MRA[[j-1]] <- eval_basis(cbind(MRA[[j]]$W %*% alpha_x[[j-1]], MRA[[j]]$W %*% alpha_y[[j-1]]), grid, use_spam = use_spam)
+            MRA[[j-1]] <- eval_basis(cbind(MRA[[j]]$W %*% alpha_x[[j-1]], MRA[[j]]$W %*% alpha_y[[j-1]]), grid, use_spam = use_spam, ncores = ncores, nchunks = nchunks)
             Q[[j-1]] <- make_Q(sqrt(MRA[[j-1]]$n_dims),
                                       phi=rep(0.9, length(MRA[[j-1]]$n_dims)), use_spam = use_spam)
 

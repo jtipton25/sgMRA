@@ -24,7 +24,7 @@ distance_near_with_ddist_cpp <- function(locs, locs_grid, radius, n_neighbors = 
 #' @return The thresheld pairwise distance
 #'
 #' @export
-distance_near_row_cpp <- function(i, locs, locs_grid, radius, byrow = TRUE) {
+distance_near_row_cpp <- function(i, locs, locs_grid, radius, byrow = FALSE) {
     .Call('_sgMRA_distance_near_row_cpp', PACKAGE = 'sgMRA', i, locs, locs_grid, radius, byrow)
 }
 
@@ -38,7 +38,7 @@ distance_near_row_cpp <- function(i, locs, locs_grid, radius, byrow = TRUE) {
 #' @param byrow Perform calculation row/column-wise
 #'
 #' @export
-distance_near_loop_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = TRUE) {
+distance_near_loop_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = FALSE) {
     .Call('_sgMRA_distance_near_loop_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow)
 }
 
@@ -54,7 +54,7 @@ distance_near_loop_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, b
 #' @return The thresheld pairwise distance
 #'
 #' @export
-distance_near_chunk_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = TRUE, joint_index = TRUE, nchunks = NULL, ncores = 1L) {
+distance_near_chunk_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, byrow = FALSE, joint_index = TRUE, nchunks = NULL, ncores = 1L) {
     .Call('_sgMRA_distance_near_chunk_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow, joint_index, nchunks, ncores)
 }
 

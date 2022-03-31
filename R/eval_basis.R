@@ -92,6 +92,8 @@ make_grid <- function(locs,
 #' @param grid A grid object that is the output of \code{make_grid}
 #' @param basis_type The basis function type. Currently only "wendland" is accepted
 #' @param use_spam Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices
+#' @param ncores The number of cores to use for parallelization
+#' @param nchunks The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.
 #'
 #' @return
 #' @export
@@ -102,7 +104,9 @@ eval_basis <- function(
     locs,
     grid,
     basis_type    = "wendland",
-    use_spam      = TRUE
+    use_spam      = TRUE,
+    ncores        = 1L,
+    nchunks       = NULL
 ) {
     ##
     ## check inputs
@@ -133,6 +137,10 @@ eval_basis <- function(
     # }
 
     N <- nrow(locs)
+    ncores <- as.integer(ncores)
+    if (!is.null(nchunks)) {
+        nchunks <- as.integer(nchunks)
+    }
 
     ## Assign as many gridpoints (approximately) as data
     # n_grid <- ceiling(sqrt(N / 2^(M:1 - 1)))
@@ -155,8 +163,24 @@ eval_basis <- function(
         # TODO: rewrite to include basis and dbasis -- not worth it as this doesn't add much speed
 
 
-        D[[m]] <- distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
+        if (ncores == 1) {
+            D[[m]] <- distance_near_with_ddist_cpp(as.matrix(locs), as.matrix(grid$locs_grid[[m]]),
                                           radius = grid$radius[m])
+        } else {
+            # TODO: make the indexing/renaming more efficient
+            D_tmp <- do.call(rbind,
+                              distance_near_chunk_cpp(as.matrix(locs),
+                                                      as.matrix(grid$locs_grid[[m]]),
+                                                      radius = grid$radius[m],
+                                                      nchunks = nchunks,
+                                                      ncores = ncores))
+            # TODO: make the indexing/renaming more efficient
+            D[[m]]$ind <- as.matrix(D_tmp[, c(1, 2)])
+            D[[m]]$V <- D_tmp[, 3]
+            D[[m]]$ddistx <- D_tmp[, 4]
+            D[[m]]$ddisty <- D_tmp[, 5]
+        }
+
         D[[m]]$basis <- make_basis(D[[m]]$V, grid$radius[m], basis_type='wendland')
         D[[m]]$dbasis <- dwendland_basis(D[[m]]$V, grid$radius[m])
 

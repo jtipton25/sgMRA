@@ -13,7 +13,7 @@ library(sgMRA)
 
 set.seed(404)
 
-N <- 2^14
+N <- 2^16
 
 M <- 3
 n_coarse_grid <- 80
@@ -23,6 +23,22 @@ n_coarse_grid <- 80
 # source("~/sgMRA/R/sim-deep-mra.R")
 dat_sim <- sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.1, use_spam = FALSE)
 
+# fun <- function(ncores) {
+#     sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.1, use_spam = FALSE, ncores = ncores)
+# }
+# bm <- microbenchmark::microbenchmark(
+#     fun(1L),
+#     fun(4L),
+#     fun(16L),
+#     fun(32L),
+#     times = 4)
+# bm
+# print(bm, unit='relative')
+# autoplot(bm)
+
+# profvis::profvis({
+#     sim_deep_mra(N, M, n_coarse_grid, n_layers = 3, sigma = 0.1, use_spam = FALSE, ncores = 32L)
+# })
 
 
 y=dat_sim$y
@@ -186,15 +202,15 @@ bm <- microbenchmark::microbenchmark(
     fun0(),
     # fun(1),
     # fun(2),
-    # fun(4),
+    fun(4),
     fun(6),
     fun(6, nchunks=100*6),
-    # fun(8),
-    # fun(10),
-    # fun(16),
-    # fun(24),
-    # fun(36),
-    # fun(48),
+    fun(8),
+    fun(10),
+    fun(16),
+    fun(24),
+    fun(36),
+    fun(48),
     # fun(56),
     times=10)
 bm

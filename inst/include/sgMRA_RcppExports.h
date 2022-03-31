@@ -46,7 +46,7 @@ namespace sgMRA {
         return Rcpp::as<Rcpp::List >(rcpp_result_gen);
     }
 
-    inline arma::mat distance_near_row_cpp(const double& i, const arma::rowvec& locs, const arma::mat& locs_grid, const double& radius, const bool& byrow = true) {
+    inline arma::mat distance_near_row_cpp(const double& i, const arma::rowvec& locs, const arma::mat& locs_grid, const double& radius, const bool& byrow = false) {
         typedef SEXP(*Ptr_distance_near_row_cpp)(SEXP,SEXP,SEXP,SEXP,SEXP);
         static Ptr_distance_near_row_cpp p_distance_near_row_cpp = NULL;
         if (p_distance_near_row_cpp == NULL) {
@@ -67,7 +67,7 @@ namespace sgMRA {
         return Rcpp::as<arma::mat >(rcpp_result_gen);
     }
 
-    inline arma::mat distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors = 86, const bool& byrow = true) {
+    inline arma::mat distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors = 86, const bool& byrow = false) {
         typedef SEXP(*Ptr_distance_near_loop_cpp)(SEXP,SEXP,SEXP,SEXP,SEXP);
         static Ptr_distance_near_loop_cpp p_distance_near_loop_cpp = NULL;
         if (p_distance_near_loop_cpp == NULL) {
@@ -88,7 +88,7 @@ namespace sgMRA {
         return Rcpp::as<arma::mat >(rcpp_result_gen);
     }
 
-    inline arma::field<arma::mat> distance_near_chunk_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors = 86, const bool& byrow = true, const bool& joint_index = true, Rcpp::Nullable<int> nchunks = R_NilValue, const int& ncores = 1) {
+    inline arma::field<arma::mat> distance_near_chunk_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors = 86, const bool& byrow = false, const bool& joint_index = true, Rcpp::Nullable<int> nchunks = R_NilValue, const int& ncores = 1) {
         typedef SEXP(*Ptr_distance_near_chunk_cpp)(SEXP,SEXP,SEXP,SEXP,SEXP,SEXP,SEXP,SEXP);
         static Ptr_distance_near_chunk_cpp p_distance_near_chunk_cpp = NULL;
         if (p_distance_near_chunk_cpp == NULL) {

@@ -23,7 +23,7 @@ using namespace arma;
 //'
 //' @export
 //[[Rcpp::export]]
-arma::mat distance_near_row_cpp(const double& i, const arma::rowvec& locs, const arma::mat& locs_grid, const double& radius, const bool& byrow=true) {
+arma::mat distance_near_row_cpp(const double& i, const arma::rowvec& locs, const arma::mat& locs_grid, const double& radius, const bool& byrow=false) {
     // Rcpp::List distance_near_row_cpp(const double& i, const arma::mat& locs, const arma::mat& locs_grid, const double& radius) {
     int N_grid = locs_grid.n_rows;
 
@@ -88,7 +88,7 @@ arma::mat distance_near_row_cpp(const double& i, const arma::rowvec& locs, const
 //'
 //' @export
 //[[Rcpp::export]]
-arma::mat distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors=86, const bool& byrow=true) {
+arma::mat distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors=86, const bool& byrow=false) {
     // Rcpp::List distance_near_loop_cpp(const arma::mat& locs, const arma::mat& locs_grid, const double& radius, const int& n_neighbors=86) {
 
     // https://stackoverflow.com/questions/26514691/dynamically-readjustable-arrays-and-openmp
@@ -174,7 +174,7 @@ arma::field<arma::mat> distance_near_chunk_cpp(const arma::mat& locs,
                                        const arma::mat& locs_grid,
                                        const double& radius,
                                        const int& n_neighbors=86,
-                                       const bool& byrow=true,
+                                       const bool& byrow=false,
                                        const bool& joint_index=true,
                                        Rcpp::Nullable<int> nchunks=R_NilValue,
                                        const int& ncores=1) {
