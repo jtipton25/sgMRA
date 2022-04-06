@@ -64,10 +64,10 @@ sigma2 <- 0.25
 
 epsilon <- rnorm(N, 0, sqrt(sigma2))
 
-y <- as.numeric(W %*% alpha + sigma2)
+y <- as.numeric(W %*% alpha + epsilon)
 # y <- as.numeric(X %*% beta + W %*% alpha + sigma2)
 
-dat <- data.frame(x=locs[, 1], y = locs[, 2], z = y)
+dat <- data.frame(x=locs[, 1], y = locs[, 2], z = y, mu = W %*% alpha)
 
 p_sim <- ggplot(dat, aes(x, y, fill = z)) +
     geom_raster() +
@@ -75,21 +75,26 @@ p_sim <- ggplot(dat, aes(x, y, fill = z)) +
     ggtitle("Simulated")
 p_sim
 
+p_latent <- ggplot(dat, aes(x, y, fill = mu)) +
+    geom_raster() +
+    scale_fill_viridis_c() +
+    ggtitle("Simulated")
+p_latent
+
 # gradient descent function for MRA using minibatch ----
 
 U <- cbind(X, W)
 message("loss = ", target_fun(y, U, c(rep(0, length(beta)), alpha)))
-message("loss = ", target_fun(y, U, c(beta, alpha)))
+# message("loss = ", target_fun(y, U, c(beta, alpha)))
 
 # profvis::profvis(
 system.time(
     dat_mini <- regression_gradient_descent(c(y),
                                        X, W, inits = rnorm(ncol(U))*0.1,
                                        threshold = 0.000001,
-                                       learn_rate = 1, num_iters = 2000,
+                                       learn_rate = 1, num_iters = 20000,
                                        print_every = 50,
-                                       minibatch_size = 2^8)
-)
+                                       minibatch_size = 2^8))
 
 # Using full gradient -- This algorithm gets more competitive with increasing sample size
 # profvis::profvis(
@@ -97,15 +102,16 @@ system.time(
     dat_full <- regression_gradient_descent(c(y),
                                        X, W, inits = rnorm(ncol(U))* 0.1,
                                        threshold = 0.000001,
-                                       learn_rate = 1, num_iters = 2000,
+                                       learn_rate = 0.1, num_iters = 20000,
                                        print_every = 50,
-                                       minibatch_size = NULL)
-)
+                                       minibatch_size = NULL))
 
 
 
-plot(dat_mini$loss, type='l')
-lines(dat_full$loss, col='red', type='l')
+# plot(dat_mini$loss, type='l')
+# lines(dat_full$loss, col='red', type='l')
+plot(dat_full$loss, type='l')
+abline(h = target_fun(y, U, c(rep(0, length(beta)), alpha)), col='red')
 
 # predictions from the minibatch model
 beta_idx <- grepl("beta", names(dat_mini))
@@ -118,7 +124,8 @@ y_pred_full <- U %*% as.numeric(beta_fit_full)
 
 
 dat <- data.frame(x = locs[, 1], y = locs[, 2], z = drop(W %*% alpha), y_sim = y,
-                  y_pred_mini = drop(y_pred_mini), y_pred_full = drop(y_pred_full))
+                  y_pred_mini = drop(y_pred_mini),
+                  y_pred_full = drop(y_pred_full))
 
 p_mini <- ggplot(dat, aes(x, y, fill = y_pred_mini)) +
     geom_raster() +
@@ -130,40 +137,46 @@ p_full <- ggplot(dat, aes(x, y, fill = y_pred_full)) +
     ggtitle("Full fit")
 
 p_sim / p_mini / p_full
+# p_sim / p_full
+
+(p_sim + p_latent) / (p_mini + p_full)
+
+p_latent / p_full
 
 sd(y - y_pred_mini)
-sd(y - y_pred_full)
+mean((y - y_pred_full)^2)
 
 
 dat %>%
-    pivot_longer(cols= y_pred_mini:y_pred_full) %>%
-    ggplot(aes(x = y_sim, y=value)) +
+    # pivot_longer(cols= y_pred_mini:y_pred_full) %>%
+    # ggplot(aes(x = y_sim, y=value)) +
+    ggplot(aes(x = y_sim, y=y_pred_full)) +
     geom_hex() +
-    geom_abline(slope=1, intercept=0, color="red") +
-    facet_wrap(~ name, nrow=2)
+    geom_abline(slope=1, intercept=0, color="red") #+
+    # facet_wrap(~ name, nrow=2)
 
 tU <- t(U)
 tUU <- t(U) %*% U
 theta_test <- rnorm(ncol(U))
 
-bm <- microbenchmark::microbenchmark(
-    tUU %*% theta_test,
-    tU %*% (U %*% theta_test), times = 10
-)
-autoplot(bm)
+# bm <- microbenchmark::microbenchmark(
+#     tUU %*% theta_test,
+#     tU %*% (U %*% theta_test), times = 10
+# )
+# autoplot(bm)
 
 
-tUy <- t(U) %*% y
-idx <- sample(1:length(y), 2^6)
-
-y_idx <- y[idx]
-tUy_idx <- tU[, idx] %*% y_idx
-
-
-bm <- microbenchmark::microbenchmark(
-    gradient_fun(y, tUy, tUU, theta_test),
-    gradient_fun(y[idx], tU[, idx] %*% y[idx], tUU, theta_test), times = 10)
-autoplot(bm)
+# tUy <- t(U) %*% y
+# idx <- sample(1:length(y), 2^6)
+#
+# y_idx <- y[idx]
+# tUy_idx <- tU[, idx] %*% y_idx
+#
+#
+# bm <- microbenchmark::microbenchmark(
+#     gradient_fun(y, tUy, tUU, theta_test),
+#     gradient_fun(y[idx], tU[, idx] %*% y[idx], tUU, theta_test), times = 10)
+# autoplot(bm)
 # all.equal(    gradient_fun(y, U, theta_test),
 #               gradient_fun2(y, U, tUy, tUU, theta_test))
 
@@ -192,10 +205,11 @@ dat %>%
 
 # fitted MSE and R^2
 preds <- as.numeric(cbind(X, W) %*% unlist(dat[nrow(dat), ][1:(ncol(dat) - 2)]))
-mean((y - preds)^2)
-cor(y, preds)^2
+mean((y - dat$y_pred_full)^2)
+cor(y, dat$y_pred_full)^2
 # oracle MSE and R^2
-mu <- as.numeric(X %*% beta + W %*% alpha)
+# mu <- as.numeric(X %*% beta + W %*% alpha)
+mu <- as.numeric(W %*% alpha)
 mean((y - mu)^2)
 cor(y, mu)^2
 
