@@ -64,10 +64,11 @@ sigma2 <- 0.25
 
 epsilon <- rnorm(N, 0, sqrt(sigma2))
 
-y <- as.numeric(W %*% alpha + epsilon)
+mu <- drop(W %*% alpha)
+y <- as.numeric(mu + epsilon)
 # y <- as.numeric(X %*% beta + W %*% alpha + sigma2)
 
-dat <- data.frame(x=locs[, 1], y = locs[, 2], z = y, mu = W %*% alpha)
+dat <- data.frame(x=locs[, 1], y = locs[, 2], z = y, mu = mu)
 
 p_sim <- ggplot(dat, aes(x, y, fill = z)) +
     geom_raster() +
@@ -108,7 +109,9 @@ system.time(
 
 
 
-# plot(dat_mini$loss, type='l')
+layout(matrix(1:2, 2, 1))
+plot(dat_mini$loss, type='l')
+abline(h = target_fun(y, U, c(rep(0, length(beta)), alpha)), col='red')
 # lines(dat_full$loss, col='red', type='l')
 plot(dat_full$loss, type='l')
 abline(h = target_fun(y, U, c(rep(0, length(beta)), alpha)), col='red')
@@ -144,6 +147,8 @@ p_sim / p_mini / p_full
 p_latent / p_full
 
 sd(y - y_pred_mini)
+sd(y - y_pred_full)
+mean((y - y_pred_mini)^2)
 mean((y - y_pred_full)^2)
 
 

@@ -4,7 +4,7 @@
 \alias{distance_near_row_cpp}
 \title{Calculate thresheld pairwise distance for a row}
 \usage{
-distance_near_row_cpp(i, locs, locs_grid, radius, byrow = TRUE)
+distance_near_row_cpp(i, locs, locs_grid, radius, byrow = FALSE)
 }
 \arguments{
 \item{i}{The row index}

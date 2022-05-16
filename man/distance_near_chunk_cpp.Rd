@@ -9,7 +9,7 @@ distance_near_chunk_cpp(
   locs_grid,
   radius,
   n_neighbors = 86L,
-  byrow = TRUE,
+  byrow = FALSE,
   joint_index = TRUE,
   nchunks = NULL,
   ncores = 1L

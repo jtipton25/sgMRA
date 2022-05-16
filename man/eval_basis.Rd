@@ -4,7 +4,14 @@
 \alias{eval_basis}
 \title{Evaluate the MRA basis}
 \usage{
-eval_basis(locs, grid, basis_type = "wendland", use_spam = TRUE)
+eval_basis(
+  locs,
+  grid,
+  basis_type = "wendland",
+  use_spam = TRUE,
+  ncores = 1L,
+  nchunks = NULL
+)
 }
 \arguments{
 \item{locs}{An N x 2 matrix of spatial locations}
@@ -14,6 +21,10 @@ eval_basis(locs, grid, basis_type = "wendland", use_spam = TRUE)
 \item{basis_type}{The basis function type. Currently only "wendland" is accepted}
 
 \item{use_spam}{Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices}
+
+\item{ncores}{The number of cores to use for parallelization}
+
+\item{nchunks}{The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.}
 }
 \value{
 

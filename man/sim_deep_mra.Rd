@@ -10,7 +10,9 @@ sim_deep_mra(
   n_coarse_grid = 20,
   n_layers = 3,
   sigma = 0.25,
-  use_spam = FALSE
+  use_spam = FALSE,
+  ncores = 1L,
+  nchunks = NULL
 )
 }
 \arguments{
@@ -25,6 +27,10 @@ sim_deep_mra(
 \item{sigma}{The observation standard deviation}
 
 \item{use_spam}{A logical value of whether to use the spam library (use_spam=TRUE) or the Matrix library (use_spam=FALSE) for sparse matrix calculations}
+
+\item{ncores}{The number of cores to use for parallelization}
+
+\item{nchunks}{The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.}
 }
 \value{
 

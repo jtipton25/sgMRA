@@ -9,7 +9,7 @@ distance_near_loop_cpp(
   locs_grid,
   radius,
   n_neighbors = 86L,
-  byrow = TRUE
+  byrow = FALSE
 )
 }
 \arguments{

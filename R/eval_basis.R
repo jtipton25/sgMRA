@@ -47,8 +47,11 @@ make_grid <- function(locs,
     radius           <- radius_fine_grid * (2^(M:1 - 1))
 
     ## generate a set of grid locations for the basis
-    locs_grid    <- vector(mode = "list", length = M)
-    W            <- vector(mode = "list", length = M)
+    locs_grid  <- vector(mode = "list", length = M)
+    # W            <- vector(mode = "list", length = M)
+    delta_x    <- vector(mode = "list", length = M)
+    delta_y    <- vector(mode = "list", length = M)
+
 
     for (m in 1:M) {
 
@@ -63,24 +66,25 @@ make_grid <- function(locs,
             max_y,
             length.out = n_grid[m]
         )
-        delta_x <- seq_x[2] - seq_x[1]
-        delta_y <- seq_y[2] - seq_y[1]
+        delta_x[[m]] <- seq_x[2] - seq_x[1]
+        delta_y[[m]] <- seq_y[2] - seq_y[1]
         seq_x <- c(
-            min(seq_x) - delta_x * (n_padding:1),
+            min(seq_x) - delta_x[[m]] * (n_padding:1),
             seq_x,
-            max(seq_x) + delta_x * (1:n_padding)
+            max(seq_x) + delta_x[[m]] * (1:n_padding)
         )
         seq_y <- c(
-            min(seq_y) - delta_y * (n_padding:1),
+            min(seq_y) - delta_y[[m]] * (n_padding:1),
             seq_y,
-            max(seq_y) + delta_y * (1:n_padding)
+            max(seq_y) + delta_y[[m]] * (1:n_padding)
         )
 
         locs_grid[[m]] <- expand.grid(seq_x, seq_y)
 
     }
 
-    return(list(locs_grid=locs_grid, radius = radius))
+    return(list(locs_grid = locs_grid, radius = radius,
+                delta_x = delta_x, delta_y = delta_y))
 
 }
 
