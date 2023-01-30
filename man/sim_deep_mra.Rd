@@ -32,9 +32,6 @@ sim_deep_mra(
 
 \item{nchunks}{The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.}
 }
-\value{
-
-}
 \description{
 Simulate deep MRA
 }

@@ -57,6 +57,16 @@ p2 <- ggplot(dat, aes(x = x, y = y, fill = y_obs)) +
 p1 + p2
 
 
+# sample the data
+
+sample_percent <- 0.8
+s <- sample(1:N, N * sample_percent)
+y_s <- y[s]
+y_oos <- y[-s]
+
+locs_s <- locs[s, ]
+locs_oos <- locs[-s, ]
+
 # dat <- data.frame(x = locs$x, y = locs$y,
 #                   # layer = rep(c(1, 1, 2, 2, 3), each=N),
 #                   layer = rep(c(1, 1, 2), each=N),
@@ -77,11 +87,11 @@ p1 + p2
 # Fit the model using sgd ----
 # source("~/sgMRA/scripts/fit-deep-MRA-sgd.R")
 # source("~/sgMRA/R/adam.R")
-n_iter = 5000
+n_iter = 2000
 n_steps <- 50
 
 # linear schedule
-rate_schedule <- rep(seq(0.05, 0.001, length = n_steps), each = ceiling(n_iter / n_steps))
+rate_schedule <- rep(seq(500, 1, length = n_steps), each = ceiling(n_iter / n_steps))
 # plot(rate_schedule)
 
 # exponential decay schedule
@@ -92,50 +102,60 @@ plot(rate_schedule)
 message("Simulated loss:", 1 / (2 * N) * sum((y - z)^2))
 # profvis::profvis({
 # system.time({
-    out <- fit_sgd(y = y, locs = locs, grid = grid,
-                   # learn_rate = 0.001,
-                   rate_schedule=rate_schedule,
-                   n_iter = n_iter,
-                   n_message = 50,
-                   penalized=TRUE,
-                   plot_during_fit = TRUE,
-                   noisy=TRUE)
+out <- fit_sgd(y = y_s, locs = locs_s,
+               y_obs = y_obs[s],
+               z = z[s],
+               grid = grid,
+               learn_rate = 0.001,
+               rate_schedule = rate_schedule,
+               n_iter = n_iter,
+               n_message = 50,
+               penalized = FALSE,
+               plot_during_fit = TRUE,
+               noisy = FALSE)
+
+plot(out$loss, type = 'l')
+
+n_iter = 2000
+# linear schedule
+rate_schedule <- rep(seq(50, 1, length = n_steps), each = ceiling(n_iter / n_steps))
+
 
 # })
-    # resume the GD with last model fit
-    out <- fit_sgd(y = y,
-                   locs = locs,
-                   grid = grid,
-                   alpha=out$alpha,
-                   alpha_x1=out$alpha_x1,
-                   alpha_y1=out$alpha_y1,
-                   alpha_x2=out$alpha_x2,
-                   alpha_y2=out$alpha_y2,
-                   # learn_rate = 0.001,
-                   rate_schedule=rate_schedule,
-                   n_iter = n_iter,
-                   n_message = 50,
-                   penalized=FALSE,
-                   plot_during_fit = TRUE,
-                   adam_pars = out$adam_pars,
-                   noisy=TRUE)
-# M=1, n_coarse_grid=10, layers = 3, fit-time:  elapsed, loss:
-# M=1, n_coarse_grid=10, layers = 2, fit-time: 364.731 elapsed, loss: 0.32
-# M=2, n_coarse_grid=30, layers = 2, fit-time: 1178.980 elapsed, loss: 0.0741
-# )
-# plot(out$alpha, alpha)
-# abline(0, 1, col = 'red')
+# resume the GD with last model fit
+message("Simulated loss:", 1 / (2 * N) * sum((y - z)^2))
+out <- fit_sgd(y = y_s, locs = locs_s,
+               y_obs = y_obs[s],
+               z = z[s],
+               grid = grid,
+               alpha = out$alpha,
+               alpha_x1 = out$alpha_x1,
+               alpha_y1 = out$alpha_y1,
+               alpha_x2 = out$alpha_x2,
+               alpha_y2 = out$alpha_y2,
+               learn_rate = 0.001,
+               rate_schedule = rate_schedule,
+               n_iter = n_iter,
+               n_message = 50,
+               penalized = TRUE,
+               plot_during_fit = TRUE,
+               adam_pars = out$adam_pars,
+               noisy = FALSE)
+
 plot(out$loss, type = 'l')
 
 # examine the fitted layers
+
+preds <- predict_deep_MRA(out, grid, locs)
 dat <- data.frame(x = locs$x, y = locs$y,
                   # layer = rep(c(1, 1, 2), each=N),
                   # group = rep(c("x", "y", "z"), each = N),
                   layer = rep(c(1, 1, 2, 2, 3), each=N),
                   group = rep(c("x", "y", "x", "y", "z"), each = N),
-                  z = c(drop(out$MRA2$W %*% out$alpha_x2), drop(out$MRA2$W %*% out$alpha_y2),
-                        drop(out$MRA1$W %*% out$alpha_x1), drop(out$MRA1$W %*% out$alpha_y1),
-                        drop(out$MRA$W %*% out$alpha)))
+                  z = c(preds$z_alpha_x2, preds$z_alpha_y2,
+                        preds$z_alpha_x1, preds$z_alpha_y1,
+                        preds$z))
+
 # plot_func <- function(df, name) {
 #     ggplot(data = df, aes(x = x, y = y, fill = z)) +
 #         geom_raster() +
@@ -177,7 +197,7 @@ p1 / p_fit
 
 dat <- data.frame(x = locs$x, y = locs$y,
                   z = z,
-                  z_fit = out$MRA$W %*% out$alpha)
+                  z_fit = preds$z)
 
 # p3 <- ggplot(dat, aes(x = x, y = y, fill = z_fit)) +
 #     geom_raster() +
@@ -189,7 +209,7 @@ dat <- data.frame(x = locs$x, y = locs$y,
 
 
 dat <- data.frame(z = z,
-                  z_fit = out$MRA$W %*% out$alpha)
+                  z_fit = preds$z)
 p5 <- ggplot(dat, aes(x = z, y = z_fit)) +
     geom_point() +
     stat_smooth(method = 'lm')

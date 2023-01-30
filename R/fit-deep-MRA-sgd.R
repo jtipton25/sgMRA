@@ -13,26 +13,6 @@ make_D_ind <- function(MRA) {
     return(D_ind)
 }
 
-sparse_outer_W <- function(MRA, alpha, y) {
-
-    N <- length(y)
-    N_grid <- length(alpha)
-    D_ind = make_D_ind(MRA)
-    devs <- 1 / N * (MRA$W %*% alpha - y)
-    delta_W_sparse = devs[D_ind[, 1]] * alpha[D_ind[, 2]]
-    delta_W_sparse <- sparseMatrix(i=D_ind[, 1], j=D_ind[, 2], x=delta_W_sparse, dims=c(N, N_grid))
-    return(delta_W_sparse)
-}
-
-sparse_outer_layers <- function(delta, alpha, MRA) {
-
-    N <- length(delta)
-    N_grid <- length(alpha)
-    D_ind = make_D_ind(MRA)
-    delta_sparse = delta[D_ind[, 1]] * alpha[D_ind[, 2]]
-    delta_sparse <- sparseMatrix(i=D_ind[, 1], j=D_ind[, 2], x=delta_sparse, dims=c(N, N_grid))
-    return(delta_sparse)
-}
 
 update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             alpha,
@@ -44,12 +24,36 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
                             i,
                             m, v,
                             learn_rate,
+                            rate_schedule,
                             penalized,
                             use_spam,
                             sparse_outer,
                             noisy,
                             ncores,
-                            nchunks) {
+                            nchunks,
+                            use_adamw = TRUE) {
+
+    sparse_outer_W <- function(MRA, alpha, y) {
+
+        N <- length(y)
+        N_grid <- length(alpha)
+        D_ind = make_D_ind(MRA)
+        devs <- 1 / N * (MRA$W %*% alpha - y)
+        delta_W_sparse = devs[D_ind[, 1]] * alpha[D_ind[, 2]]
+        delta_W_sparse <- sparseMatrix(i=D_ind[, 1], j=D_ind[, 2], x=delta_W_sparse, dims=c(N, N_grid))
+        return(delta_W_sparse)
+    }
+
+    sparse_outer_layers <- function(delta, alpha, MRA) {
+
+        N <- length(delta)
+        N_grid <- length(alpha)
+        D_ind = make_D_ind(MRA)
+        delta_sparse = delta[D_ind[, 1]] * alpha[D_ind[, 2]]
+        delta_sparse <- sparseMatrix(i=D_ind[, 1], j=D_ind[, 2], x=delta_sparse, dims=c(N, N_grid))
+        return(delta_sparse)
+    }
+
 
     N <- length(y)
     # first layer w.r.t alpha
@@ -111,11 +115,30 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
     }
 
     adam_out <- adam(i, grad, m, v)
-    alpha    <- alpha    - learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
-    alpha_x1 <- alpha_x1 - learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon)
-    alpha_y1 <- alpha_y1 - learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon)
-    alpha_x2 <- alpha_x2 - learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
-    alpha_y2 <- alpha_y2 - learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
+    if (penalized) {
+        if (use_adamw) {
+            # adamW https://arxiv.org/pdf/1711.05101.pdf
+            alpha    <- alpha    - rate_schedule * (learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon) + Q %*% alpha / N)
+            alpha_x1 <- alpha_x1 - rate_schedule * (learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon) + Q1 %*% alpha_x1 / N)
+            alpha_y1 <- alpha_y1 - rate_schedule * (learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon) + Q1 %*% alpha_y1 / N)
+            alpha_x2 <- alpha_x2 - rate_schedule * (learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon) + Q2 %*% alpha_x2 / N)
+            alpha_y2 <- alpha_y2 - rate_schedule * (learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon) + Q2 %*% alpha_y2 / N)
+        } else {
+            # adam with penalized gradient
+            alpha    <- alpha    - rate_schedule * learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
+            alpha_x1 <- alpha_x1 - rate_schedule * learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon)
+            alpha_y1 <- alpha_y1 - rate_schedule * learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon)
+            alpha_x2 <- alpha_x2 - rate_schedule * learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
+            alpha_y2 <- alpha_y2 - rate_schedule * learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
+        }
+    } else {
+        # not penalized
+        alpha    <- alpha    - rate_schedule * learn_rate * adam_out$m_hat[[1]] / (sqrt(adam_out$v_hat[[1]]) + adam_out$epsilon)
+        alpha_x1 <- alpha_x1 - rate_schedule * learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon)
+        alpha_y1 <- alpha_y1 - rate_schedule * learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon)
+        alpha_x2 <- alpha_x2 - rate_schedule * learn_rate * adam_out$m_hat[[4]] / (sqrt(adam_out$v_hat[[4]]) + adam_out$epsilon)
+        alpha_y2 <- alpha_y2 - rate_schedule * learn_rate * adam_out$m_hat[[5]] / (sqrt(adam_out$v_hat[[5]]) + adam_out$epsilon)
+    }
 
 
     # the forward pass on the sgMRA
@@ -147,6 +170,7 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 #' @param penalized Fit using a penalty term
 #' @param plot_during_fit Plot the current parameter states every \code{n_message} iterations
 #' @param use_spam Whether to use the spam (\code{use_spam = TRUE}) or Matrix (\code{use_spam = FALSE}) package for sparse matrices
+#' @param use_adamw Use the adamW optimizer
 #' @param adam_pars The adam parameter state to allow restarting the model
 #' @param sparse_outer If \code{TRUE}, calculate the outer product in a sparse format. For all but the smallest models, this should be TRUE. I should make this automatic going forward
 #' @param noisy If \code{TRUE}, add random noise to the gradient.
@@ -162,6 +186,8 @@ update_deep_mra <- function(y, locs, grid, MRA, MRA1, MRA2,
 fit_sgd <- function(y,
                     locs,
                     grid,
+                    y_obs = NULL,
+                    z = NULL,
                     alpha = NULL,
                     alpha_x1 = NULL,
                     alpha_y1 = NULL,
@@ -175,6 +201,7 @@ fit_sgd <- function(y,
                     plot_during_fit = FALSE,
                     use_spam = FALSE,
                     adam_pars = NULL,
+                    use_adamw = TRUE,
                     sparse_outer = TRUE,
                     noisy=TRUE,
                     ncores        = 1L,
@@ -182,7 +209,7 @@ fit_sgd <- function(y,
 
 
     if (is.null(rate_schedule)) {
-        rate_schedule <- rep(learn_rate, n_iter)
+        rate_schedule <- rep(1, n_iter)
     }
 
     N <- length(y)
@@ -370,13 +397,15 @@ fit_sgd <- function(y,
                                 Q, Q1, Q2,
                                 i,
                                 m, v,
-                                learn_rate   =  rate_schedule[i],
-                                penalized    = penalized,
-                                use_spam     = use_spam,
-                                sparse_outer = sparse_outer,
-                                noisy        = noisy,
-                                ncores       = ncores,
-                                nchunks      = nchunks)
+                                learn_rate    = learn_rate,
+                                rate_schedule =  rate_schedule[i],
+                                penalized     = penalized,
+                                use_spam      = use_spam,
+                                sparse_outer  = sparse_outer,
+                                noisy         = noisy,
+                                ncores        = ncores,
+                                nchunks       = nchunks,
+                                use_adamw     = use_adamw)
         alpha <- pars$alpha
         alpha_x1 <- pars$alpha_x1
         alpha_y1 <- pars$alpha_y1
@@ -417,3 +446,32 @@ fit_sgd <- function(y,
 
 
 
+#' Title
+#'
+#' @param out The output from fit_sgd
+#' @param grid The grid
+#' @param locs_pred The locations at which to predict
+#' @param use_spam
+#' @param ncores
+#' @param nchunks
+#'
+#' @return
+#' @export
+#'
+#'
+predict_deep_MRA <- function(out, grid, locs_pred,
+                             use_spam = FALSE,
+                             ncores        = 1L,
+                             nchunks       = NULL) {
+
+    MRA2 <- eval_basis(locs_pred, grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
+    z_alpha_x2 <- drop(MRA2$W %*% out$alpha_x2)
+    z_alpha_y2 <- drop(MRA2$W %*% out$alpha_y2)
+    MRA1 <- eval_basis(cbind(z_alpha_x2, z_alpha_y2), grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
+    z_alpha_x1 <- drop(MRA1$W %*% out$alpha_x1)
+    z_alpha_y1 <- drop(MRA1$W %*% out$alpha_y1)
+    MRA <- eval_basis(cbind(z_alpha_x1, z_alpha_y1), grid, use_spam=use_spam, ncores = ncores, nchunks = nchunks)
+    z <- drop(MRA$W %*% out$alpha)
+    return(list(z = z, z_alpha_x1 = z_alpha_x1, z_alpha_y1 = z_alpha_y1,
+                z_alpha_x2 = z_alpha_x2, z_alpha_y2 = z_alpha_y2))
+}

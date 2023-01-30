@@ -168,6 +168,79 @@ RcppExport SEXP _sgMRA_distance_near_chunk_cpp(SEXP locsSEXP, SEXP locs_gridSEXP
     UNPROTECT(1);
     return rcpp_result_gen;
 }
+// distance_near_nonstationary
+Rcpp::List distance_near_nonstationary(arma::cube& sq_devs, arma::vec& a, arma::vec& b, double& radius);
+static SEXP _sgMRA_distance_near_nonstationary_try(SEXP sq_devsSEXP, SEXP aSEXP, SEXP bSEXP, SEXP radiusSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< arma::cube& >::type sq_devs(sq_devsSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type a(aSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type b(bSEXP);
+    Rcpp::traits::input_parameter< double& >::type radius(radiusSEXP);
+    rcpp_result_gen = Rcpp::wrap(distance_near_nonstationary(sq_devs, a, b, radius));
+    return rcpp_result_gen;
+END_RCPP_RETURN_ERROR
+}
+RcppExport SEXP _sgMRA_distance_near_nonstationary(SEXP sq_devsSEXP, SEXP aSEXP, SEXP bSEXP, SEXP radiusSEXP) {
+    SEXP rcpp_result_gen;
+    {
+        Rcpp::RNGScope rcpp_rngScope_gen;
+        rcpp_result_gen = PROTECT(_sgMRA_distance_near_nonstationary_try(sq_devsSEXP, aSEXP, bSEXP, radiusSEXP));
+    }
+    Rboolean rcpp_isInterrupt_gen = Rf_inherits(rcpp_result_gen, "interrupted-error");
+    if (rcpp_isInterrupt_gen) {
+        UNPROTECT(1);
+        Rf_onintr();
+    }
+    bool rcpp_isLongjump_gen = Rcpp::internal::isLongjumpSentinel(rcpp_result_gen);
+    if (rcpp_isLongjump_gen) {
+        Rcpp::internal::resumeJump(rcpp_result_gen);
+    }
+    Rboolean rcpp_isError_gen = Rf_inherits(rcpp_result_gen, "try-error");
+    if (rcpp_isError_gen) {
+        SEXP rcpp_msgSEXP_gen = Rf_asChar(rcpp_result_gen);
+        UNPROTECT(1);
+        Rf_error(CHAR(rcpp_msgSEXP_gen));
+    }
+    UNPROTECT(1);
+    return rcpp_result_gen;
+}
+// distance_nonstationary
+arma::mat distance_nonstationary(arma::cube& sq_devs, arma::vec& a, arma::vec& b);
+static SEXP _sgMRA_distance_nonstationary_try(SEXP sq_devsSEXP, SEXP aSEXP, SEXP bSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::traits::input_parameter< arma::cube& >::type sq_devs(sq_devsSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type a(aSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type b(bSEXP);
+    rcpp_result_gen = Rcpp::wrap(distance_nonstationary(sq_devs, a, b));
+    return rcpp_result_gen;
+END_RCPP_RETURN_ERROR
+}
+RcppExport SEXP _sgMRA_distance_nonstationary(SEXP sq_devsSEXP, SEXP aSEXP, SEXP bSEXP) {
+    SEXP rcpp_result_gen;
+    {
+        Rcpp::RNGScope rcpp_rngScope_gen;
+        rcpp_result_gen = PROTECT(_sgMRA_distance_nonstationary_try(sq_devsSEXP, aSEXP, bSEXP));
+    }
+    Rboolean rcpp_isInterrupt_gen = Rf_inherits(rcpp_result_gen, "interrupted-error");
+    if (rcpp_isInterrupt_gen) {
+        UNPROTECT(1);
+        Rf_onintr();
+    }
+    bool rcpp_isLongjump_gen = Rcpp::internal::isLongjumpSentinel(rcpp_result_gen);
+    if (rcpp_isLongjump_gen) {
+        Rcpp::internal::resumeJump(rcpp_result_gen);
+    }
+    Rboolean rcpp_isError_gen = Rf_inherits(rcpp_result_gen, "try-error");
+    if (rcpp_isError_gen) {
+        SEXP rcpp_msgSEXP_gen = Rf_asChar(rcpp_result_gen);
+        UNPROTECT(1);
+        Rf_error(CHAR(rcpp_msgSEXP_gen));
+    }
+    UNPROTECT(1);
+    return rcpp_result_gen;
+}
 
 // validate (ensure exported C++ functions exist before calling them)
 static int _sgMRA_RcppExport_validate(const char* sig) { 
@@ -177,6 +250,8 @@ static int _sgMRA_RcppExport_validate(const char* sig) {
         signatures.insert("arma::mat(*distance_near_row_cpp)(const double&,const arma::rowvec&,const arma::mat&,const double&,const bool&)");
         signatures.insert("arma::mat(*distance_near_loop_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&)");
         signatures.insert("arma::field<arma::mat>(*distance_near_chunk_cpp)(const arma::mat&,const arma::mat&,const double&,const int&,const bool&,const bool&,Rcpp::Nullable<int>,const int&)");
+        signatures.insert("Rcpp::List(*distance_near_nonstationary)(arma::cube&,arma::vec&,arma::vec&,double&)");
+        signatures.insert("arma::mat(*distance_nonstationary)(arma::cube&,arma::vec&,arma::vec&)");
     }
     return signatures.find(sig) != signatures.end();
 }
@@ -187,6 +262,8 @@ RcppExport SEXP _sgMRA_RcppExport_registerCCallable() {
     R_RegisterCCallable("sgMRA", "_sgMRA_distance_near_row_cpp", (DL_FUNC)_sgMRA_distance_near_row_cpp_try);
     R_RegisterCCallable("sgMRA", "_sgMRA_distance_near_loop_cpp", (DL_FUNC)_sgMRA_distance_near_loop_cpp_try);
     R_RegisterCCallable("sgMRA", "_sgMRA_distance_near_chunk_cpp", (DL_FUNC)_sgMRA_distance_near_chunk_cpp_try);
+    R_RegisterCCallable("sgMRA", "_sgMRA_distance_near_nonstationary", (DL_FUNC)_sgMRA_distance_near_nonstationary_try);
+    R_RegisterCCallable("sgMRA", "_sgMRA_distance_nonstationary", (DL_FUNC)_sgMRA_distance_nonstationary_try);
     R_RegisterCCallable("sgMRA", "_sgMRA_RcppExport_validate", (DL_FUNC)_sgMRA_RcppExport_validate);
     return R_NilValue;
 }
@@ -196,6 +273,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_sgMRA_distance_near_row_cpp", (DL_FUNC) &_sgMRA_distance_near_row_cpp, 5},
     {"_sgMRA_distance_near_loop_cpp", (DL_FUNC) &_sgMRA_distance_near_loop_cpp, 5},
     {"_sgMRA_distance_near_chunk_cpp", (DL_FUNC) &_sgMRA_distance_near_chunk_cpp, 8},
+    {"_sgMRA_distance_near_nonstationary", (DL_FUNC) &_sgMRA_distance_near_nonstationary, 4},
+    {"_sgMRA_distance_nonstationary", (DL_FUNC) &_sgMRA_distance_nonstationary, 3},
     {"_sgMRA_RcppExport_registerCCallable", (DL_FUNC) &_sgMRA_RcppExport_registerCCallable, 0},
     {NULL, NULL, 0}
 };

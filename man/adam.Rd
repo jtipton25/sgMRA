@@ -21,9 +21,6 @@ adam(k, grad, m, v, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-08)
 
 \item{epsilon}{A small amount to prevent a divide-by-zero error}
 }
-\value{
-
-}
 \description{
 ADAM stochastic process update
 }

@@ -32,8 +32,5 @@ adam <- function(k, grad, m, v, beta1=0.9, beta2=0.999, epsilon=1e-8) {
         v_hat[[j]] <- v[[j]] / (1 - beta2^k)
     }
 
-    # update m_hat and v_hat
-
-
     return(list(m_hat = m_hat, v_hat = v_hat, m = m, v = v, epsilon = epsilon))
 }

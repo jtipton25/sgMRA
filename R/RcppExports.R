@@ -58,6 +58,36 @@ distance_near_chunk_cpp <- function(locs, locs_grid, radius, n_neighbors = 86L, 
     .Call('_sgMRA_distance_near_chunk_cpp', PACKAGE = 'sgMRA', locs, locs_grid, radius, n_neighbors, byrow, joint_index, nchunks, ncores)
 }
 
+#' Calculate thresheld pairwise distance
+#'
+#' @param sq_devs An N x N_grid x 2 array of squared deviations between locations and gridcells
+#' @param a A N vector of weights in the x direction
+#' @param b A N vector of weights in the x direction
+#' @param radius The threshold radius
+NULL
+
+#' @return The ()thresheld) pairwise distance
+#'
+#' @export
+distance_near_nonstationary <- function(sq_devs, a, b, radius) {
+    .Call('_sgMRA_distance_near_nonstationary', PACKAGE = 'sgMRA', sq_devs, a, b, radius)
+}
+
+#' Calculate thresheld pairwise distance
+#'
+#' @param sq_devs An N x N_grid x 2 array of squared deviations between locations and gridcells
+#' @param a A N vector of weights in the x direction
+#' @param b A N vector of weights in the x direction
+#' @param radius The threshold radius
+NULL
+
+#' @return The ()thresheld) pairwise distance
+#'
+#' @export
+distance_nonstationary <- function(sq_devs, a, b) {
+    .Call('_sgMRA_distance_nonstationary', PACKAGE = 'sgMRA', sq_devs, a, b)
+}
+
 # Register entry points for exported C++ functions
 methods::setLoadAction(function(ns) {
     .Call('_sgMRA_RcppExport_registerCCallable', PACKAGE = 'sgMRA')

@@ -8,6 +8,8 @@ fit_sgd(
   y,
   locs,
   grid,
+  y_obs = NULL,
+  z = NULL,
   alpha = NULL,
   alpha_x1 = NULL,
   alpha_y1 = NULL,
@@ -21,6 +23,7 @@ fit_sgd(
   plot_during_fit = FALSE,
   use_spam = FALSE,
   adam_pars = NULL,
+  use_adamw = TRUE,
   sparse_outer = TRUE,
   noisy = TRUE,
   ncores = 1L,
@@ -60,6 +63,8 @@ fit_sgd(
 
 \item{adam_pars}{The adam parameter state to allow restarting the model}
 
+\item{use_adamw}{Use the adamW optimizer}
+
 \item{sparse_outer}{If \code{TRUE}, calculate the outer product in a sparse format. For all but the smallest models, this should be TRUE. I should make this automatic going forward}
 
 \item{noisy}{If \code{TRUE}, add random noise to the gradient.}
@@ -67,9 +72,6 @@ fit_sgd(
 \item{ncores}{The number of cores to use for parallelization}
 
 \item{nchunks}{The number of chunks to divide the distance calculation into. The default argument of NULL will use the same number of chunks as the number of cores.}
-}
-\value{
-
 }
 \description{
 Title

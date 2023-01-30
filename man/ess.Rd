@@ -41,9 +41,6 @@ interest.}
 \item{max_iter}{The maximum number of iterations to perform for the
 elliptical slice sampler.}
 }
-\value{
-
-}
 \description{
 Code for the elliptical slice sampler
 }

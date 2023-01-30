@@ -109,6 +109,48 @@ namespace sgMRA {
         return Rcpp::as<arma::field<arma::mat> >(rcpp_result_gen);
     }
 
+    inline Rcpp::List distance_near_nonstationary(arma::cube& sq_devs, arma::vec& a, arma::vec& b, double& radius) {
+        typedef SEXP(*Ptr_distance_near_nonstationary)(SEXP,SEXP,SEXP,SEXP);
+        static Ptr_distance_near_nonstationary p_distance_near_nonstationary = NULL;
+        if (p_distance_near_nonstationary == NULL) {
+            validateSignature("Rcpp::List(*distance_near_nonstationary)(arma::cube&,arma::vec&,arma::vec&,double&)");
+            p_distance_near_nonstationary = (Ptr_distance_near_nonstationary)R_GetCCallable("sgMRA", "_sgMRA_distance_near_nonstationary");
+        }
+        RObject rcpp_result_gen;
+        {
+            RNGScope RCPP_rngScope_gen;
+            rcpp_result_gen = p_distance_near_nonstationary(Shield<SEXP>(Rcpp::wrap(sq_devs)), Shield<SEXP>(Rcpp::wrap(a)), Shield<SEXP>(Rcpp::wrap(b)), Shield<SEXP>(Rcpp::wrap(radius)));
+        }
+        if (rcpp_result_gen.inherits("interrupted-error"))
+            throw Rcpp::internal::InterruptedException();
+        if (Rcpp::internal::isLongjumpSentinel(rcpp_result_gen))
+            throw Rcpp::LongjumpException(rcpp_result_gen);
+        if (rcpp_result_gen.inherits("try-error"))
+            throw Rcpp::exception(Rcpp::as<std::string>(rcpp_result_gen).c_str());
+        return Rcpp::as<Rcpp::List >(rcpp_result_gen);
+    }
+
+    inline arma::mat distance_nonstationary(arma::cube& sq_devs, arma::vec& a, arma::vec& b) {
+        typedef SEXP(*Ptr_distance_nonstationary)(SEXP,SEXP,SEXP);
+        static Ptr_distance_nonstationary p_distance_nonstationary = NULL;
+        if (p_distance_nonstationary == NULL) {
+            validateSignature("arma::mat(*distance_nonstationary)(arma::cube&,arma::vec&,arma::vec&)");
+            p_distance_nonstationary = (Ptr_distance_nonstationary)R_GetCCallable("sgMRA", "_sgMRA_distance_nonstationary");
+        }
+        RObject rcpp_result_gen;
+        {
+            RNGScope RCPP_rngScope_gen;
+            rcpp_result_gen = p_distance_nonstationary(Shield<SEXP>(Rcpp::wrap(sq_devs)), Shield<SEXP>(Rcpp::wrap(a)), Shield<SEXP>(Rcpp::wrap(b)));
+        }
+        if (rcpp_result_gen.inherits("interrupted-error"))
+            throw Rcpp::internal::InterruptedException();
+        if (Rcpp::internal::isLongjumpSentinel(rcpp_result_gen))
+            throw Rcpp::LongjumpException(rcpp_result_gen);
+        if (rcpp_result_gen.inherits("try-error"))
+            throw Rcpp::exception(Rcpp::as<std::string>(rcpp_result_gen).c_str());
+        return Rcpp::as<arma::mat >(rcpp_result_gen);
+    }
+
 }
 
 #endif // RCPP_sgMRA_RCPPEXPORTS_H_GEN_

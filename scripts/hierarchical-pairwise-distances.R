@@ -1,26 +1,29 @@
-# hierarchical pairwise distance estimates -- try to use recursive grid search to find neighbors
+# hierarchical pairwise distance estimates
+# Use recursive grid search to find neighbors between two sets of vectors v1 and v2 ----
+
 library(patchwork)
+library(tidyverse)
+library(Matrix)
+library(igraph)
+library(fastmatch)
 
-# TODO
-# - refine the single resolution grid
-# - explore hierarchical graphics structure
-# - once working, improve computational cost
+# load the experimental R functions
+file_list <- list.files(here::here("scripts", "temp-distance-functions"), full.names = TRUE)
+invisible(lapply(file_list, source))
 
 
-
+# Single level, find points nearest to gridcell
 
 # example for the function
 
-N <- 500
-v1 <- matrix(rnorm(N*2), N, 2)
-v2 <- matrix(rnorm(N*2), N, 2)
+N <- 5000
+v1 <- matrix(runif(N*2), N, 2)
+v2 <- matrix(runif(N*2), N, 2)
 
 trunc = 0.1
 n_knots = 20
 max_levels = 4
-library(tidyverse)
-library(Matrix)
-library(igraph)
+
 
 # v1 is a Nx2 vector
 # v2 is a Nx2 vector
@@ -115,7 +118,9 @@ p_points <- ggplot() +
 
 p_grid / p_points
 # proportion of filtered points for pairwise calculation
-nrow(dat_check) / N^2
+nrow(dat_check) / N^2 * nrow(grid)
+
+
 
 
 
@@ -123,14 +128,14 @@ nrow(dat_check) / N^2
 # try and write a general function ----
 # TODO: Need to get a hierarchical filtering done
 M <- 5
-N <- 100000
+N <- 5000
 n_coarse_grid <- 10
-locs <- matrix(rnorm(N*2), N, 2)
-grid <- sgMRA::make_grid(locs, M = M, n_coarse_grid = n_coarse_grid)
+locs <- matrix(runif(N*2), N, 2)
+grid <- sgMRA::make_grid(locs, M = M, n_coarse_grid = n_coarse_grid, n_padding = 1L)
 trunc = 0.1
 
 
-hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
+# hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
 
     # example for the function
     library(tidyverse)
@@ -139,42 +144,6 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
     library(fastmatch)
     library(furrr)
 
-    get_neighbors <- function(i, g, nearest_idx) {
-        pairwise_to_check <- which(nearest_idx %in% neighbors(g, i, mode = "all"))
-        return(tibble(v_idx = pairwise_to_check, grid_cell = i))
-    }
-
-    get_neighbors_layers <- function(i, g) {
-        pairwise_to_check <- neighbors(g, i, mode = "all")
-        return(tibble(v_idx = as.integer(pairwise_to_check), grid_cell = i))
-    }
-
-    get_pairwise_distance <- function(i, g, nearest_idx, locs, trunc) {
-        dat_neighbors <- get_neighbors(i, g, nearest_idx)
-        if (nrow(dat_neighbors) <= 1) {
-            return(tibble(i = numeric(), j = numeric(), D = numeric()))
-        } else {
-            pairs <- as_tibble(t(Rfast::comb_n(dat_neighbors$v_idx, 2))) %>%
-                rename(i = V1, j = V2)
-            if (nrow(pairs) == 1) {
-                pairs$D <- sqrt(sum((locs[pairs$i, ] - locs[pairs$j, ])^2))
-            } else {
-                pairs$D <- sqrt(rowSums((locs[pairs$i, ] - locs[pairs$j, ])^2))
-            }
-            # drop the points below the threshold
-            pairs <- pairs %>%
-                filter(D <= trunc)
-            return(pairs)
-        }
-    }
-
-    expand_matrix <- function(A) {
-        m <- nrow(A)
-        n <- ncol(A)
-        B <- Matrix(0, nrow = m, ncol = m, sparse = TRUE)
-        C <- Matrix(0, nrow = n, ncol = n, sparse = TRUE)
-        cbind(rbind(B, t(A)), rbind(A, C))
-    }
 
 
     # start with a single layer, create a recursive layer above
@@ -188,20 +157,20 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
 
     # build the graphs for each resolution -- pretty sure this is not needed
     # g <- vector(mode = 'list', length = M)
-    # r_grid  <- rep(0, M)
+    r_grid  <- rep(0, M)
 
-    # for (m in 1:M) {
-    #
+    for (m in 1:M) {
+
     #     # assumes a rectangular grid
-    #     delta_x <- grid$delta_x[[m]]
-    #     delta_y <- grid$delta_y[[m]]
-    #     r_grid[m] <- sqrt(delta_x^2 + delta_y^2)
+        delta_x <- grid$delta_x[[m]]
+        delta_y <- grid$delta_y[[m]]
+        r_grid[m] <- sqrt(delta_x^2 + delta_y^2)
     #
     #     # grid within a resolution
     #     D_grid <- fields::rdist(grid$locs_grid[[m]])
     #     A_grid <- Matrix((D_grid < 1.01 * r_grid[m]) * 1)
     #     g[[m]] <- igraph::graph_from_adjacency_matrix(A_grid)
-    # }
+    }
 
     # calculate the hierarchical graph -- use each layer to successively build the others
 
@@ -216,6 +185,7 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
     D_grid_layers <- fields::rdist(grid$locs_grid[[1]], grid$locs_grid[[1+1]])
     A_grid_layers <- Matrix((D_grid_layers < 1.01 * r_grid[1]), sparse = TRUE) * 1
     A_grid_layers <- expand_matrix(A_grid_layers)
+    # A_grid_layers <- expand_matrix_symmetric(A_grid_layers)
     # adjacency graph between grid layer 1 and grid layer 2
     g_layers[[1]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
     # nearest coarse grid cell to each fine grid cell
@@ -227,26 +197,29 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
     #                                  nearest_idx = nearest_idx_layers[[1]])
 
     dat_neighbors[[1]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[1]]),
-                                    get_neighbors_layers,
-                                    g = g_layers[[1]]) %>%
+                                  get_neighbors_layers,
+                                  g = g_layers[[1]]) %>%
         distinct() %>%
         mutate(layer = paste(1, 2, sep = '~'))
 
-    for (m in 2:(M-1)) {
+    if (M > 2) {
+        for (m in 2:(M-1)) {
 
-        D_grid_layers <- fields::rdist(grid$locs_grid[[m]], grid$locs_grid[[m+1]])
-        A_grid_layers <- Matrix((D_grid_layers <= 1.01 * r_grid[m]), sparse = TRUE) * 1
-        A_grid_layers <- expand_matrix(A_grid_layers)
-        # adjacency graph between grid layer 1 and grid layer 2
-        g_layers[[m]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
+            D_grid_layers <- fields::rdist(grid$locs_grid[[m]], grid$locs_grid[[m+1]])
+            A_grid_layers <- Matrix((D_grid_layers <= 1.01 * r_grid[m]), sparse = TRUE) * 1
+            A_grid_layers <- expand_matrix(A_grid_layers)
+            # adjacency graph between grid layer 1 and grid layer 2
+            g_layers[[m]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
 
-        # get the neighbors between layers
-        dat_neighbors[[m]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]),
-                                        get_neighbors_layers,
-                                        g = g_layers[[m]]) %>%
-            distinct() %>%
-        mutate(layer = paste(m, m+1, sep = '~'))
+            # get the neighbors between layers
+            dat_neighbors[[m]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]),
+                                          get_neighbors_layers,
+                                          g = g_layers[[m]]) %>%
+                distinct() %>%
+                mutate(layer = paste(m, m+1, sep = '~'))
+        }
     }
+
 
     # create one very large graph rather than many small graphs to compare speed
 
@@ -270,67 +243,46 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
     #     distinct() %>%
     #     mutate(layer = paste(1, 2, sep = '~'))
 
-    for (m in 2:(M-1)) {
+    if (M > 2) {
+        for (m in 2:(M-1)) {
 
-        D_grid_layers <- fields::rdist(grid$locs_grid[[m]], grid$locs_grid[[m+1]])
-        A_grid_list[[m]] <- Matrix((D_grid_layers <= 1.01 * r_grid[m]), sparse = TRUE) * 1
-        # A_grid_layers <- expand_matrix(A_grid_layers)
-        # adjacency graph between grid layer 1 and grid layer 2
-        # g_layers[[m]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
+            D_grid_layers <- fields::rdist(grid$locs_grid[[m]], grid$locs_grid[[m+1]])
+            A_grid_list[[m]] <- Matrix((D_grid_layers <= 1.01 * r_grid[m]), sparse = TRUE) * 1
+            # A_grid_layers <- expand_matrix(A_grid_layers)
+            # adjacency graph between grid layer 1 and grid layer 2
+            # g_layers[[m]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
 
-        # get the neighbors between layers
-        # dat_neighbors[[m]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]),
-        #                               get_neighbors_layers,
-        #                               g = g_layers[[m]]) %>%
-        #     distinct() %>%
-        #     mutate(layer = paste(m, m+1, sep = '~'))
+            # get the neighbors between layers
+            # dat_neighbors[[m]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]),
+            #                               get_neighbors_layers,
+            #                               g = g_layers[[m]]) %>%
+            #     distinct() %>%
+            #     mutate(layer = paste(m, m+1, sep = '~'))
+        }
     }
 
     # AA <- rapply(A_grid_list, expand_matrix)
     # AA <- expand_matrix(A_grid_list[[1]])
 
 
-    expand_matrix_list <- function(A_list) {
-        M <- length(A_list)
-        n <- rep(0, M)
-        p <- rep(0, M)
 
-
-        rows <- vector(mode = 'list', length = M)
-
-        for (m in 1:M) {
-            n[m] <- nrow(A_list[[m]])
-            p[m] <- ncol(A_list[[m]])
-        }
-
-        for (m in 1:M) {
-
-            if (m == 1) {
-                C <-  Matrix(0, nrow = n[m], ncol = sum(p[2:M]), sparse = TRUE)
-                rows[[m]] <- cbind(A_list[[m]], C)
-
-            } else if (m == M) {
-                B <-  Matrix(0, nrow = n[m], ncol = sum(p[1:(M-1)]), sparse = TRUE)
-                rows[[m]] <- cbind(B, A_list[[m]])
-            } else {
-                B <-  Matrix(0, nrow = n[m], ncol = sum(p[1:(m-1)]), sparse = TRUE)
-                C <-  Matrix(0, nrow = n[m], ncol = sum(p[(m+1):M]), sparse = TRUE)
-                rows[[m]] <- cbind(B, cbind(A_list[[m]], C))
-            }
-        }
-        all_rows <- do.call(rbind, rows)
-        A <- expand_matrix(all_rows)
-        return(A)
-    }
 
     A_grid_all <- expand_matrix_list(A_grid_list)
     g_all <- igraph::graph_from_adjacency_matrix(A_grid_all)
-    neighbors(g_all, 10, mode = "all")
+    neighbors(g_all, 501, mode = "all")
+    neighbors(g_all, 1, mode='all')
+
+    # alternative approach -- find nearest coarse grid cell then evaluate all possible neighbors at once
+
+    dat_locs_grid_from_graph <- purrr::map_dfr(.x = 1:nrow(locs),
+                                    .f = get_nearest_gridcell_from_graph,
+                                    locs = locs,
+                                    grid = grid,
+                                    g = g_all)
 
 
-
-
-
+    coarse_idx <- apply(fields::rdist(locs, grid$locs_grid[[1]]), 1, which.min)
+    zzz=sapply(1:nrow(locs), function(i) neighbors(g_all, coarse_idx[i], mode = 'all'))
 
     # dat_neighbors <- map_dfr(.x = 1:nrow(grsid$locs_grid[[2-1]]),
     #                              get_neighbors,
@@ -343,7 +295,7 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
     # m <- 4
     p_grid <- vector(mode = 'list', length = M-1)
     p_points <- vector(mode = 'list', length = M-1)
-    for (m in 2:M) {
+    for (m in 2:M) { # assumes n_coarse_grid = 10
         if (m == 2) {
             i= 275 # m = 2
         } else if (m == 3) {
@@ -385,259 +337,210 @@ hierarchical_pairwise_distances <- function(locs, grid, trunc = 0.1) {
     wrap_plots(p_grid, nrow = 2)
     wrap_plots(p_points, nrow = 2)
 
-        # Trace the graph between layers to a terminal node for each observation location ----
-
-
-        `%fin%` <- function(x, table) {
-            # stopifnot(require(fastmatch))
-            fmatch(x, table, nomatch = 0L) > 0L
-        }
-
-        trace_neighbors <- function(locs, grid, dat_neighbors, use_tidy = FALSE, use_fast_match = TRUE) {
-            # given a location, trace the neighborhood down to a neares fine resolution gridpoint
-            if ((length(locs) != 2) | is.matrix(locs))
-                stop("locs must be a matrix with 1 row and 2 columns")
-            # loop over locs
-            M <- length(grid)
-            D <- fields::rdist(locs1, grid$locs_grid[[1]])
-            if (M > 1) {
-                idx <- which.min(D) # nearest coarse grid cell
-            }
-            for (m in 2:M) {
-
-                # calculate distance at next layer using the neighborhood
-                # tidyverse way is slow
-                if (use_tidy) {
-                    if (use_fast_match) {
-                        idx <- dat_neighbors[[m-1]] %>%
-                            filter(grid_cell %fin% idx) %>%
-                            pull(v_idx) - nrow(grid$locs_grid[[m-1]])
-                    } else {
-
-                        idx <- dat_neighbors[[m-1]] %>%
-                            filter(grid_cell %in% idx) %>%
-                            pull(v_idx) - nrow(grid$locs_grid[[m-1]])
-                    }
-                } else {
-                    if (use_fast_match) {
-                        idx <- dat_neighbors[[m-1]]$v_idx[dat_neighbors[[m-1]]$grid_cell %fin% idx] - nrow(grid$locs_grid[[m-1]])
-                    } else {
-                        idx <- dat_neighbors[[m-1]]$v_idx[dat_neighbors[[m-1]]$grid_cell %in% idx] - nrow(grid$locs_grid[[m-1]])
-                    }
-                }
-                D <- fields::rdist(locs1, grid$locs_grid[[m]][idx, ])
-                if (m < M) {
-                    # Don't subset the neighborhood for the final distance
-                    idx <- idx[which.min(D)]
-                }
-            }
-            return(idx)
-        }
-
-        get_nearest_gridcell <- function(i, locs, grid, dat_neighbors,  use_tidy = FALSE, use_fast_match = TRUE) {
-            return(tibble(i = i, idx = trace_neighbors(locs[i, ], grid, dat_neighbors, use_tidy, use_fast_match)))
-        }
-
-        # this is REALLY SLOW. How can this be sped up?
-        dat_locs_grid <- purrr::map_dfr(.x = 1:nrow(locs),
-                                        .f = get_nearest_gridcell,
-                                        locs = locs,
-                                        grid = grid,
-                                        use_tidy = FALSE,
-                                        dat_neighbors = dat_neighbors)
-
-
-        # using profvis, at least it appears to be linear in complexity of time...
-
-
-        tmp <- vector(mode='list', length=nrow(locs))
-        for (i in 1:nrow(locs)) {
-            tmp[[i]] <- get_nearest_gridcell(i, locs = locs,
-                                             grid = grid, dat_neighbors = dat_neighbors)
-
-        }
-
-        DD=fields::rdist(locs, grid$locs_grid[[M]])
-        idx_test <- dat_locs_grid %>%
-            filter(i == 1) %>%
-            pull(idx)
-        layout(matrix(1:2, 2, 1))
-        hist(DD[1, idx_test])
-        hist(DD[1, ])
+    # Trace the graph between layers to a terminal node for each observation location ----
 
 
 
 
-            }
-
-            dat_grid <- as_tibble(grid$locs_grid[[4]]) |>
-                rename(x = Var1, y = Var2) |>
-                mutate(grid_cell = 1:nrow(grid$locs_grid[[4]])) |>
-                mutate(color = ifelse(grid_cell %in% idx, "neighbor", "not neighbor"))
-
-            p_grid <- ggplot(dat_grid, aes(x, y, color = color)) +
-                geom_point(alpha = 0.5) +
-                scale_color_viridis_d(end=0.8) +
-                geom_point(data = data.frame(x = locs1[1], y = locs1[2]),
-                           aes(x = x, y = y), inherit.aes = FALSE)
-            p_grid
-        # }
+    # this is REALLY SLOW. How can this be sped up?
+    dat_locs_grid <- purrr::map_dfr(.x = 1:nrow(locs),
+                                    .f = get_nearest_gridcell,
+                                    locs = locs,
+                                    grid = grid,
+                                    dat_neighbors = dat_neighbors)
 
 
+    # using profvis, at least it appears to be linear in complexity of time...
 
 
-        D_grid_layers <- fields::rdist(grid$locs_grid[[m]], grid$locs_grid[[m+1]])
-        D_grid_layers[D_grid_layers > r_grid[1]] <- 0
-
-        tmp = list()
-        for (i in 1:nrow(grid$locs_grid[[1+1]])) {
-            tmp[[i]] <- get_pairwise_distance(i, g_layers[[1]], nearest_idx_layers[[1]],
-                                              grid$locs_grid[[1+1]], r_grid[1])
-        }
-
-        dat_distance <- map_dfr(.x = 1:nrow(grid$locs_grid[[1]]),
-                                get_pairwise_distance,
-                                g = g_layers[[1]],
-                                nearest_idx = nearest_idx_layers[[1]],
-                                locs = grid$locs_grid[[1+1]],
-                                trunc = r_grid[1])
-
-        # remove duplicate rows
-        dat_distance <- dat_distance %>%
-            distinct()
-
-        D_sparse_from_layers <- Matrix(D_grid_layers, sparse = TRUE)
-        D_sparse <- sparseMatrix(i = dat_distance$i,
-                                 j = dat_distance$j,
-                                 x = dat_distance$D,
-                                 dims = c(nrow(grid$locs_grid[[1]]), nrow(grid$locs_grid[[1+1]])))
-
-        all.equal(D_sparse_from_layers, D_sparse)
-
-
-        A_grid_layers <- Matrix((D_grid < 1.01 * r_grid[m]) * 1)
-        g_layers[[m]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
-        nearest_idx_layers[[m]] <- apply(D_grid_layers, 2, which.min)
-        neighbors_layers[[m]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[m+1]]),
-                                         .f = get_neighbors,
-                                         g = g_layers[[m]],
-                                         nearest_idx = nearest_idx_layers[[m]])
+    tmp <- vector(mode='list', length=nrow(locs))
+    for (i in 1:nrow(locs)) {
+        tmp[[i]] <- get_nearest_gridcell(i, locs = locs,
+                                         grid = grid, dat_neighbors = dat_neighbors)
 
     }
 
+    DD=fields::rdist(locs, grid$locs_grid[[M]])
+    idx_test <- dat_locs_grid %>%
+        filter(i == 1) %>%
+        pull(idx)
+    layout(matrix(1:2, 2, 1))
+    hist(DD[1, idx_test])
+    hist(DD[1, ])
 
 
 
-    ##
-    ## Use the graph to evaluate pairwise distance between the locations
-    ##
 
-    # build the graphs for each resolution
-    g <- vector(mode = 'list', length = M)
-    r_grid  <- rep(0, M)
+# }
 
-    for (m in 1:M) {
+dat_grid <- as_tibble(grid$locs_grid[[4]]) |>
+    rename(x = Var1, y = Var2) |>
+    mutate(grid_cell = 1:nrow(grid$locs_grid[[4]])) |>
+    mutate(color = ifelse(grid_cell %in% idx, "neighbor", "not neighbor"))
 
-        # assumes a rectangular grid
-        delta_x <- grid$delta_x[[m]]
-        delta_y <- grid$delta_y[[m]]
-        r_grid[m] <- sqrt(delta_x^2 + delta_y^2)
+p_grid <- ggplot(dat_grid, aes(x, y, color = color)) +
+    geom_point(alpha = 0.5) +
+    scale_color_viridis_d(end=0.8) #+
+    # geom_point(data = data.frame(x = locs1[1], y = locs1[2]),
+    #            aes(x = x, y = y), inherit.aes = FALSE)
+p_grid
+# }
 
-        # grid within a resolution
-        D_grid <- fields::rdist(grid$locs_grid[[m]])
-        A_grid <- Matrix((D_grid < 1.01 * r_grid[m]) * 1)
-        g[[m]] <- igraph::graph_from_adjacency_matrix(A_grid)
-    }
 
-    # pairwise distance from vectors to the grid to find nearest gridpoint
+
+
+D_grid_layers <- fields::rdist(grid$locs_grid[[1]], grid$locs_grid[[1+1]])
+D_grid_layers[D_grid_layers > r_grid[1]] <- 0
+
+tmp = list()
+for (i in 1:nrow(grid$locs_grid[[1+1]])) {
+    tmp[[i]] <- get_pairwise_distance(i, g_layers[[1]], nearest_idx_layers[[1]],
+                                      grid$locs_grid[[1+1]], r_grid[1])
+}
+
+dat_distance <- map_dfr(.x = 1:nrow(grid$locs_grid[[1]]),
+                        get_pairwise_distance,
+                        g = g_layers[[1]],
+                        nearest_idx = nearest_idx_layers[[1]],
+                        locs = grid$locs_grid[[1+1]],
+                        trunc = r_grid[1])
+
+# remove duplicate rows -- lots of duplicates
+dat_distance <- dat_distance %>%
+    distinct()
+
+D_sparse_from_layers <- Matrix(D_grid_layers, sparse = TRUE)
+D_sparse <- sparseMatrix(i = dat_distance$i,
+                         j = dat_distance$j,
+                         x = dat_distance$D,
+                         dims = c(nrow(grid$locs_grid[[1]]), nrow(grid$locs_grid[[1+1]])))
+
+all.equal(D_sparse_from_layers, D_sparse)
+
+
+A_grid_layers <- Matrix((D_grid < 1.01 * r_grid[m]) * 1)
+g_layers[[m]] <- igraph::graph_from_adjacency_matrix(A_grid_layers)
+nearest_idx_layers[[m]] <- apply(D_grid_layers, 2, which.min)
+neighbors_layers[[m]] <- map_dfr(.x = 1:nrow(grid$locs_grid[[m+1]]),
+                                 .f = get_neighbors,
+                                 g = g_layers[[m]],
+                                 nearest_idx = nearest_idx_layers[[m]])
+
+}
+
+
+
+
+##
+## Use the graph to evaluate pairwise distance between the locations
+##
+
+# build the graphs for each resolution
+g <- vector(mode = 'list', length = M)
+r_grid  <- rep(0, M)
+
+for (m in 1:M) {
+
+    # assumes a rectangular grid
+    delta_x <- grid$delta_x[[m]]
+    delta_y <- grid$delta_y[[m]]
+    r_grid[m] <- sqrt(delta_x^2 + delta_y^2)
+
+    # grid within a resolution
+    D_grid <- fields::rdist(grid$locs_grid[[m]])
+    A_grid <- Matrix((D_grid < 1.01 * r_grid[m]) * 1)
+    g[[m]] <- igraph::graph_from_adjacency_matrix(A_grid)
+}
+
+# pairwise distance from vectors to the grid to find nearest gridpoint
+D <- fields::rdist(locs, grid$locs_grid[[m]])
+nearest_idx <- apply(D, 1, which.min)
+
+
+
+# can parallelize this if needed...
+dat_check <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]), get_neighbors, g = g[[m]], nearest_idx = nearest_idx)
+# tmp = list()
+# for (i in 1:nrow(grid$locs_grid[[m]])) {
+#     tmp[[i]] <- get_pairwise_distance(i, g[[m]], nearest_idx, trunc)
+# }
+dat_distance <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]),
+                        get_pairwise_distance, g = g[[m]], nearest_idx = nearest_idx,
+                        locs = locs, trunc = trunc)
+
+# remove duplicate rows
+dat_distance <- dat_distance %>%
+    distinct()
+
+# calculate the sparse index
+dat_check$D <- sqrt(sum((locs[dat_check$v_idx, ] - grid$locs_grid[[m]][dat_check$grid_cell, ])^2))
+dat_check
+
+D_full <- fields::rdist(locs)
+D_full[D_full > trunc] <- 0
+D_sparse_from_full <- Matrix(D_full, sparse = TRUE)
+D_sparse <- sparseMatrix(i = dat_distance$i,
+                         j = dat_distance$j,
+                         x = dat_distance$D,
+                         dims = c(nrow(locs), nrow(locs)),
+                         symmetric = TRUE)
+
+all.equal(D_sparse_from_full, D_sparse)
+
+# D_sparse <- sparseMatrix(i = dat_check$v_idx, j = dat_check$grid_cell, x = dat_check$D,
+#                         dims = c(nrow(locs), nrow(grid$locs_grid[[m]])))
+# explore the check
+if (m == 1) {
+    i <- 193 # m=1
+} else if (m ==2) {
+    i <- 525 # m=2
+} else if (m == 3) {
+    i <- 1274 # m=3
+}
+
+
+dat_check_i <- dat_check %>%
+    filter(grid_cell == i)
+
+# neighbors1 <- Matrix((nearest_idx1 %in% neighbors(g, i)) * 1)
+# neighbors2 <- Matrix((nearest_idx2 %in% neighbors(g, i)) * 1)
+# pairwise_to_check1 <- which(nearest_idx %in% neighbors(g, i, mode = "all"))
+# dat_check <- tibble(v_idx = pairwise_to_check1, grid_cell = i)
+
+if (nrow(D) < 1000) {
     D <- fields::rdist(locs, grid$locs_grid[[m]])
-    nearest_idx <- apply(D, 1, which.min)
+    D[cbind(dat_check_i$v_idx, i)]
+    layout(matrix(1:2, 2, 1))
+    hist(D)
+    hist(D[cbind(dat_check_i$v_idx, i)])
+}
 
+dat_shading <- dat_check_i %>%
+    # pivot_longer(cols = c(v1, v2), names_to = "vector", values_to = "v_idx") %>%
+    mutate(alpha = 0.25)
 
+dat_grid <- as_tibble(grid$locs_grid[[m]]) |>
+    rename(x = Var1, y = Var2) |>
+    mutate(grid_cell = 1:nrow(grid$locs_grid[[m]])) %>%
+    mutate(color = ifelse(grid_cell == i, "center", ifelse(grid_cell %in% neighbors(g[[m]], i, mode = "all"), "neighbor", "exterior")))
 
-    # can parallelize this if needed...
-    dat_check <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]), get_neighbors, g = g[[m]], nearest_idx = nearest_idx)
-    # tmp = list()
-    # for (i in 1:nrow(grid$locs_grid[[m]])) {
-    #     tmp[[i]] <- get_pairwise_distance(i, g[[m]], nearest_idx, trunc)
-    # }
-    dat_distance <- map_dfr(.x = 1:nrow(grid$locs_grid[[m]]),
-                            get_pairwise_distance, g = g[[m]], nearest_idx = nearest_idx,
-                            locs = locs, trunc = trunc)
+p_grid <- ggplot(dat_grid, aes(x, y, color = color)) +
+    geom_point() +
+    scale_color_viridis_d()
+p_grid
 
-    # remove duplicate rows
-    dat_distance <- dat_distance %>%
-        distinct()
+dat_plot <- tibble(x = locs[, 1], y = locs[, 2], v_idx = 1:nrow(locs)) %>%
+    left_join(dat_shading, by=c("v_idx")) %>%
+    mutate(alpha = replace_na(alpha, 0.05), color = "observation")
 
-    # calculate the sparse index
-    dat_check$D <- sqrt(sum((locs[dat_check$v_idx, ] - grid$locs_grid[[m]][dat_check$grid_cell, ])^2))
-    dat_check
+p_points <- ggplot() +
+    geom_point(data = dat_plot, aes(x, y, alpha = alpha, color = color)) +
+    geom_point(data = dat_grid, aes(x = x, y = y, color = color)) +
+    scale_color_viridis_d(begin = 0., end = 0.9) +
+    scale_alpha_identity()
+p_points
 
-    D_full <- fields::rdist(locs)
-    D_full[D_full > trunc] <- 0
-    D_sparse_from_full <- Matrix(D_full, sparse = TRUE)
-    D_sparse <- sparseMatrix(i = dat_distance$i,
-                             j = dat_distance$j,
-                             x = dat_distance$D,
-                             dims = c(nrow(locs), nrow(locs)),
-                             symmetric = TRUE)
-
-    all.equal(D_sparse_from_full, D_sparse)
-
-    # D_sparse <- sparseMatrix(i = dat_check$v_idx, j = dat_check$grid_cell, x = dat_check$D,
-    #                         dims = c(nrow(locs), nrow(grid$locs_grid[[m]])))
-    # explore the check
-    if (m == 1) {
-        i <- 193 # m=1
-    } else if (m ==2) {
-        i <- 525 # m=2
-    } else if (m == 3) {
-        i <- 1274 # m=3
-    }
-
-
-    dat_check_i <- dat_check %>%
-        filter(grid_cell == i)
-
-    # neighbors1 <- Matrix((nearest_idx1 %in% neighbors(g, i)) * 1)
-    # neighbors2 <- Matrix((nearest_idx2 %in% neighbors(g, i)) * 1)
-    # pairwise_to_check1 <- which(nearest_idx %in% neighbors(g, i, mode = "all"))
-    # dat_check <- tibble(v_idx = pairwise_to_check1, grid_cell = i)
-
-    if (nrow(D) < 1000) {
-        D <- fields::rdist(locs, grid$locs_grid[[m]])
-        D[cbind(dat_check_i$v_idx, i)]
-        layout(matrix(1:2, 2, 1))
-        hist(D)
-        hist(D[cbind(dat_check_i$v_idx, i)])
-    }
-
-    dat_shading <- dat_check_i %>%
-        # pivot_longer(cols = c(v1, v2), names_to = "vector", values_to = "v_idx") %>%
-        mutate(alpha = 0.25)
-
-    dat_grid <- as_tibble(grid$locs_grid[[m]]) |>
-        rename(x = Var1, y = Var2) |>
-        mutate(grid_cell = 1:nrow(grid$locs_grid[[m]])) %>%
-        mutate(color = ifelse(grid_cell == i, "center", ifelse(grid_cell %in% neighbors(g[[m]], i, mode = "all"), "neighbor", "exterior")))
-
-    p_grid <- ggplot(dat_grid, aes(x, y, color = color)) +
-        geom_point() +
-        scale_color_viridis_d()
-    p_grid
-
-    dat_plot <- tibble(x = locs[, 1], y = locs[, 2], v_idx = 1:nrow(locs)) %>%
-        left_join(dat_shading, by=c("v_idx")) %>%
-        mutate(alpha = replace_na(alpha, 0.05), color = "observation")
-
-    p_points <- ggplot() +
-        geom_point(data = dat_plot, aes(x, y, alpha = alpha, color = color)) +
-        geom_point(data = dat_grid, aes(x = x, y = y, color = color)) +
-        scale_color_viridis_d(begin = 0., end = 0.9) +
-        scale_alpha_identity()
-    p_points
-
-    p_grid / p_points
-    # proportion of filtered points for pairwise calculation
-    nrow(dat_neighbors[[M-1]]) / N^2 * nrow(grid$locs_grid[[m]])
+p_grid / p_points
+# proportion of filtered points for pairwise calculation
+nrow(dat_neighbors[[M-1]]) / N^2 * nrow(grid$locs_grid[[m]])
 }

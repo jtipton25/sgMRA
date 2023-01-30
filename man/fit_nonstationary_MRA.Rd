@@ -51,9 +51,6 @@ fit_nonstationary_MRA(
 
 \item{adam_pars}{The adam parameter state to allow restarting the model}
 }
-\value{
-
-}
 \description{
 Title
 }

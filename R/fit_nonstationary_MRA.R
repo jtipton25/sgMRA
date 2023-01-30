@@ -18,29 +18,70 @@ d_kernel_link <- function(a, trunc) {
 }
 
 
+# make_D_ind <- function(MRA) {
+#     n_layers <- length(MRA$n_dims)
+#     D_ind <- vector(mode='list', length = n_layers)
+#     if (n_layers == 1) {
+#         D_ind <- MRA$D[[1]]$ind
+#     } else {
+#         D_ind[[1]] <- MRA$D[[1]]$ind
+#         for (j in 2:n_layers) {
+#             D_ind[[j]] <- MRA$D[[j]]$ind + cbind(rep(0, nrow(MRA$D[[j]]$ind)), sum(MRA$n_dims[1:(j-1)]))
+#         }
+#         D_ind = do.call(rbind, D_ind)
+#     }
+#     return(D_ind)
+# }
+
+sparse_outer_W <- function(D_ind, W, alpha, y) {
+
+    N <- length(y)
+    N_grid <- length(alpha)
+    devs <- 1 / N * (W %*% alpha - y)
+    delta_W_sparse = devs[D_ind[, 1]] * alpha[D_ind[, 2]]
+    delta_W_sparse <- sparseMatrix(i = D_ind[, 1], j = D_ind[, 2], x = delta_W_sparse, dims = c(N, N_grid))
+    return(delta_W_sparse)
+}
+
 
 update_nonstationary_MRA <- function(y, locs, grid, sq_devs, D, radius, W, W_kernels, trunc,
                                      alpha, grid_kernels, alpha_a, alpha_b,
                                      i, m, v, learn_rate) {
 
     N <- length(y)
+    # D_ind <- which(D < radius, arr.ind = TRUE)
+    D_ind <- cbind(D@i, D@j) + 1
     delta <- drop(1 / N * (W %*% alpha - y))
 
-    # eventually make this sparse
-    delta_W <- (1 / N * (W %*% alpha - y)) %*% t(alpha)
+    # eventually make this sparse and only keep the terms needed
+    # delta_W <- (1 / N * (W %*% alpha - y)) %*% t(alpha)
+    # sparse_outer_W
+    delta_W <- sparse_outer_W(D_ind, W, alpha, y)
 
-    dW <- dwendland_basis(D, radius)
-    ddista <- sq_devs[, , 1] / D
-    ddistb <- sq_devs[, , 2] / D
+    dW <- D
+    dW@x <- dwendland_basis(D@x, radius)
+    # dW <- Matrix(dwendland_basis(D, radius), sparse = TRUE)
+    D_inverted <- D
+    D_inverted@x <- 1 / D_inverted@x
 
-    # rewrite the derivative when locations are at the grid points
-    # need to think about whether this is true
-    idx_D <- which(D == 0)
-    ddista[idx_D] <- 0
-    ddistb[idx_D] <- 0
+    # remove the zero distances when obseration locations are exactly on gridcell locations
+    zeros_idx <- which(D@x == 0)
+    D_inverted@x[zeros_idx] <- 0
+    # ddista <- sq_devs[, , 1] / D
+    # ddistb <- sq_devs[, , 2] / D
+    ddista <- sq_devs[, , 1] * D_inverted
+    ddistb <- sq_devs[, , 2] * D_inverted
 
-    d_tobit_a <- d_kernel_link(W_kernels %*% alpha_a, trunc)
-    d_tobit_b <- d_kernel_link(W_kernels %*% alpha_b, trunc)
+    # don't need this for sparse matrix
+    # # rewrite the derivative when locations are at the grid points
+    # # need to think about whether this is true
+    # idx_D <- which(D == 0)
+    # ddista[idx_D] <- 0
+    # ddistb[idx_D] <- 0
+
+
+    d_tobit_a <- d_kernel_link(as.vector(W_kernels %*% alpha_a), trunc)
+    d_tobit_b <- d_kernel_link(as.vector(W_kernels %*% alpha_b), trunc)
 
     delta_W_dW <- delta_W * dW
 
@@ -57,8 +98,32 @@ update_nonstationary_MRA <- function(y, locs, grid, sq_devs, D, radius, W, W_ker
     alpha_a <- alpha_a - learn_rate * adam_out$m_hat[[2]] / (sqrt(adam_out$v_hat[[2]]) + adam_out$epsilon)
     alpha_b <- alpha_b - learn_rate * adam_out$m_hat[[3]] / (sqrt(adam_out$v_hat[[3]]) + adam_out$epsilon)
 
-    D <- make_D_nonstationary(sq_devs, pmax(W_kernels %*% alpha_a, trunc), pmax(W_kernels %*% alpha_b, trunc))
-    W <- BayesMRA::wendland_basis(D, radius)
+    # D <- make_D_nonstationary(sq_devs, pmax(W_kernels %*% alpha_a, trunc), pmax(W_kernels %*% alpha_b, trunc))
+    # eventually make this sparse
+    # D <- distance_nonstationary(sq_devs,
+    #                                   as.vector(pmax(W_kernels %*% alpha_a, trunc)),
+    #                                   as.vector(pmax(W_kernels %*% alpha_b, trunc)))
+    DD <- distance_near_nonstationary(sq_devs,
+                                      as.vector(pmax(W_kernels %*% alpha_a, trunc)),
+                                      as.vector(pmax(W_kernels %*% alpha_b, trunc)),
+                                     radius = radius)
+    # truncate to a sparse matrix
+    # D[D >= radius] <- 0
+    # D <- as(D, "dgTMatrix")
+    D <- sparseMatrix(i = DD$ind[, 1], j = DD$ind[, 2], x = as.vector(DD$V), dims = dim(sq_devs)[1:2], repr = "T")
+
+
+        # D <- distance_near_nonstationary(sq_devs,
+    #                                   as.vector(pmax(W_kernels %*% alpha_a, trunc)),
+    #                                   as.vector(pmax(W_kernels %*% alpha_b, trunc)),
+    #                                   radius = radius)
+
+    # W1 <- sparseMatrix(i = D@i, p = D@p, x = BayesMRA::wendland_basis(D@x, radius), dims = D@Dim)
+
+
+    W <- D
+    W@x <- BayesMRA::wendland_basis(D@x, radius)
+    # W <- Matrix(BayesMRA::wendland_basis(D, radius), sparse = TRUE)
 
     return(list(alpha = alpha, alpha_a = alpha_a, alpha_b = alpha_b,
                 D = D, W = W, m=adam_out$m, v=adam_out$v))
@@ -105,6 +170,7 @@ fit_nonstationary_MRA <- function(y,
                                   plot_during_fit = FALSE,
                                   adam_pars = NULL) {
 
+    library(Matrix)
 
 
     if (is.null(rate_schedule)) {
@@ -119,7 +185,7 @@ fit_nonstationary_MRA <- function(y,
         D_kernels[i, ] <- sqrt(rowSums(sweep(grid_kernels, 2, FUN='-', locs[i, ])^2))
     }
 
-    W_kernels <- BayesMRA::wendland_basis(D_kernels, radius)
+    W_kernels <- Matrix(BayesMRA::wendland_basis(D_kernels, radius), sparse = TRUE)
     if (is.null(alpha_a)) {
         # add in penalty parameter later
         alpha_a <- rnorm(N_grid_kernels, 0, 0.1)
@@ -138,12 +204,22 @@ fit_nonstationary_MRA <- function(y,
         sq_devs[i, , ] <- sweep(grid, 2, FUN='-', locs[i, ])^2
     }
 
-    D <- matrix(0, N, N_grid)
-    for (i in 1:N) {
-        D[i, ] <- sqrt(rowSums(sq_devs[i, , ] * cbind(rep(a[i], N_grid), rep(b[i], N_grid))))
-    }
+    # D <- matrix(0, N, N_grid)
+    # for (i in 1:N) {
+    #     D[i, ] <- sqrt(rowSums(sq_devs[i, , ] * cbind(rep(a[i], N_grid), rep(b[i], N_grid))))
+    # }
+    DD <- distance_near_nonstationary(sq_devs,
+                                      as.vector(pmax(W_kernels %*% alpha_a, trunc)),
+                                      as.vector(pmax(W_kernels %*% alpha_b, trunc)),
+                                      radius = radius)
+    # truncate to a sparse matrix
+    D <- sparseMatrix(i = DD$ind[, 1], j = DD$ind[, 2], x = as.vector(DD$V), dims = dim(sq_devs)[1:2], repr = "T")
 
-    W <- BayesMRA::wendland_basis(D, radius)
+
+    # W <- Matrix(BayesMRA::wendland_basis(D, radius), sparse = TRUE)
+    # sparse kernel matrix
+    W <- D
+    W@x <- BayesMRA::wendland_basis(D@x, radius)
 
     if (is.null(alpha)) {
         # add in penalty parameter later
@@ -160,7 +236,7 @@ fit_nonstationary_MRA <- function(y,
         p1 <- ggplot(dat, aes(x = x, y = y, fill = z)) +
             geom_raster() +
             scale_fill_viridis_c()
-        dat <- data.frame(x = locs[, 1], y = locs[, 2], z = W %*% alpha)
+        dat <- data.frame(x = locs[, 1], y = locs[, 2], z = as.vector(W %*% alpha))
         p_fit <- ggplot(dat, aes(x, y, fill=z)) +
             geom_raster() +
             scale_fill_viridis_c() +
@@ -204,7 +280,7 @@ fit_nonstationary_MRA <- function(y,
             message("iteration i = ", i, " loss = ", loss[i])
             if (plot_during_fit) {
                 # examine the fitted process
-                dat <- data.frame(x = locs[, 1], y = locs[, 2], z = W %*% alpha)
+                dat <- data.frame(x = locs[, 1], y = locs[, 2], z = as.vector(W %*% alpha))
                 p_fit <- ggplot(dat, aes(x, y, fill=z)) +
                     geom_raster() +
                     scale_fill_viridis_c() +
@@ -216,7 +292,7 @@ fit_nonstationary_MRA <- function(y,
     }
 
     return(list(alpha = alpha, alpha_a = alpha_a, alpha_b = alpha_b,
-                D = D, W - W, loss = loss,
+                D = D, W = W, W_kernels = W_kernels, loss = loss,
                 adam_pars = list(m = pars$m, v = pars$v)))
 }
 

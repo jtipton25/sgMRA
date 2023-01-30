@@ -11,9 +11,6 @@ dwendland_basis(d, radius)
 
 \item{radius}{radius threshold}
 }
-\value{
-
-}
 \description{
 Title
 }
